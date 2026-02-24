@@ -1,0 +1,96 @@
+service:
+  name: wasaa-pesaflow-ml
+  version: "1.0.0"
+  domain: fraud-aml
+  description: "Pesaflow ML - Real-Time Fraud Detection & AML Risk Scoring Engine"
+
+serving:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 4
+  latency_target_ms: 200
+  request_timeout_ms: 5000
+
+models:
+  fraud:
+    name: pesaflow-fraud-detector
+    type: lightgbm
+    version: "v1.0.0"
+    inference_timeout_ms: 50
+    feature_schema_version: "1.0.0"
+    thresholds:
+      approve: 0.60
+      review: 0.75
+      block: 0.90
+  aml:
+    name: pesaflow-aml-scorer
+    type: xgboost
+    version: "v1.0.0"
+    inference_timeout_ms: 50
+    feature_schema_version: "1.0.0"
+    thresholds:
+      low: 0.50
+      medium: 0.50
+      high: 0.70
+      critical: 0.85
+  merchant:
+    name: pesaflow-merchant-risk
+    type: lightgbm
+    version: "v1.0.0"
+    inference_timeout_ms: 50
+    feature_schema_version: "1.0.0"
+    thresholds:
+      standard: 0.40
+      enhanced: 0.40
+      restricted: 0.65
+      blocked: 0.85
+
+kafka:
+  bootstrap_servers: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:29094}
+  security_protocol: ${KAFKA_SECURITY_PROTOCOL:-PLAINTEXT}
+  client_id: ${KAFKA_CLIENT_ID:-pesaflow-ml}
+  group_id: ${KAFKA_GROUP_ID:-pesaflow-ml-group}
+  topics:
+    consume:
+      - wallet.transactions.created
+      - transactions.created
+      - wallet.transferred
+      - user.updated
+      - kyc.updated
+      - sanctions.updated
+    produce:
+      fraud_decisions: fraud.decisions
+      fraud_review: fraud.review.queue
+      fraud_alerts: fraud.alerts
+      aml_scored: aml.scored
+      aml_blocked: aml.blocked
+      aml_case_created: aml.case.created
+      aml_alert: aml.alert.generated
+      merchant_risk_scored: merchant.risk.scored
+      merchant_tier_changed: merchant.tier.changed
+      merchant_blocked: merchant.risk.blocked
+      ml_alerts: ml.alerts
+
+redis:
+  feature_ttl: 300
+  velocity_ttl_1h: 3600
+  velocity_ttl_24h: 86400
+  sanctions_cache_ttl: 1800
+
+database:
+  pool_size: 20
+  max_overflow: 10
+  pool_timeout: 30
+
+monitoring:
+  metrics_prefix: pesaflow_ml
+  drift_check_interval_hours: 168
+  performance_log_interval_seconds: 60
+
+resources:
+  requests:
+    cpu: "500m"
+    memory: "512Mi"
+  limits:
+    cpu: "2"
+    memory: "2Gi"

@@ -1,0 +1,229 @@
+fraud_model:
+  name: pesaflow-fraud-detector
+  algorithm: lightgbm
+  task: binary_classification
+  objective: binary
+  metric: auc
+
+  hyperparameters:
+    num_leaves: 63
+    max_depth: 8
+    learning_rate: 0.05
+    n_estimators: 500
+    min_child_samples: 50
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.1
+    reg_lambda: 1.0
+    scale_pos_weight: 10
+    random_state: 42
+
+  features:
+    user_based:
+      - avg_transaction_amount_7d
+      - transaction_velocity_1h
+      - transaction_velocity_24h
+      - failed_login_attempts_24h
+      - account_age_days
+      - historical_fraud_flag
+    device_based:
+      - device_risk_score
+      - device_fraud_count
+      - distinct_user_count
+    transaction_based:
+      - amount
+      - geo_distance_from_last_tx
+      - time_of_day
+      - currency_risk
+
+  training:
+    test_size: 0.2
+    cv_folds: 5
+    early_stopping_rounds: 50
+    class_imbalance_method: scale_pos_weight
+    oversampling_strategy: null  # null, smote, adasyn, borderline_smote
+    calibrate: true
+    min_roc_auc: 0.92
+    min_precision: 0.90
+    min_recall: 0.85
+
+  optuna:
+    enabled: true
+    n_trials: 50
+    algorithm: lightgbm
+
+  explainability:
+    method: shap
+    top_features_stored: 10
+    compute_for: [MEDIUM, HIGH, CRITICAL]
+
+aml_model:
+  name: pesaflow-aml-scorer
+  algorithm: xgboost
+  task: binary_classification
+  objective: "binary:logistic"
+  eval_metric: auc
+
+  hyperparameters:
+    max_depth: 8
+    learning_rate: 0.03
+    n_estimators: 600
+    min_child_weight: 5
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.5
+    reg_lambda: 2.0
+    scale_pos_weight: 15
+    random_state: 42
+
+  features:
+    transaction_level:
+      - amount
+      - velocity_1h
+      - velocity_24h
+      - total_volume_24h
+      - avg_amount_30d
+      - std_amount_30d
+      - time_of_day
+      - is_cross_border
+    user_level:
+      - account_age_days
+      - device_count_30d
+      - ip_count_30d
+      - new_device_flag
+      - kyc_completeness_score
+    network_level:
+      - network_risk_score
+      - circular_transfer_flag
+      - shared_device_cluster_size
+    geographic:
+      - high_risk_country_flag
+      - sanctions_proximity_score
+      - ip_country_mismatch
+    behavioral:
+      - historical_structuring_flag
+      - structuring_score_24h
+      - rapid_drain_flag
+
+  training:
+    test_size: 0.2
+    cv_folds: 5
+    early_stopping_rounds: 50
+    class_imbalance_method: scale_pos_weight
+    oversampling_strategy: null
+    calibrate: true
+    min_roc_auc: 0.90
+    min_precision: 0.88
+    min_recall: 0.85
+
+  optuna:
+    enabled: true
+    n_trials: 50
+    algorithm: xgboost
+
+  explainability:
+    method: shap
+    top_features_stored: 10
+    compute_for: [MEDIUM, HIGH, CRITICAL]
+
+merchant_model:
+  name: pesaflow-merchant-risk
+  algorithm: lightgbm
+  task: binary_classification
+  objective: binary
+  metric: auc
+
+  hyperparameters:
+    num_leaves: 48
+    max_depth: 7
+    learning_rate: 0.05
+    n_estimators: 400
+    min_child_samples: 30
+    subsample: 0.8
+    colsample_bytree: 0.8
+    reg_alpha: 0.2
+    reg_lambda: 1.5
+    scale_pos_weight: 12
+    random_state: 42
+
+  features:
+    velocity:
+      - transaction_count_1h
+      - transaction_count_24h
+      - transaction_volume_24h
+      - unique_customers_24h
+    aggregate:
+      - avg_transaction_amount_30d
+      - std_transaction_amount_30d
+      - chargeback_rate_90d
+      - refund_rate_90d
+      - account_age_days
+    risk_signals:
+      - fraud_transaction_rate
+      - high_risk_customer_ratio
+      - cross_border_ratio
+      - velocity_spike_flag
+      - mcc_risk_score
+      - avg_customer_risk_score
+
+  training:
+    test_size: 0.2
+    cv_folds: 5
+    early_stopping_rounds: 50
+    class_imbalance_method: scale_pos_weight
+    oversampling_strategy: null
+    calibrate: true
+    min_roc_auc: 0.90
+    min_precision: 0.88
+    min_recall: 0.82
+
+  optuna:
+    enabled: true
+    n_trials: 50
+    algorithm: lightgbm
+
+  explainability:
+    method: shap
+    top_features_stored: 10
+    compute_for: [MEDIUM, HIGH, CRITICAL]
+
+drift_detection:
+  psi_threshold: 0.2
+  wasserstein_threshold: 0.1
+  accuracy_drop_threshold: 0.05
+  fraud_rate_deviation_threshold: 0.15
+  confidence_drop_threshold: 0.1
+  label_delay_warning_hours: 72
+  check_frequency: weekly
+
+  streaming:
+    enabled: true
+    adwin_delta: 0.002
+    max_window_size: 10000
+
+data_maturity:
+  check_interval_seconds: 3600
+  thresholds:
+    cold_max_samples: 100
+    warming_max_samples: 1000
+    warm_max_samples: 10000
+    cold_max_coverage: 0.70
+    warming_max_coverage: 0.90
+    psi_stable_threshold: 0.1
+
+anomaly_detection:
+  fraud:
+    contamination: 0.05
+    n_estimators: 200
+  aml:
+    contamination: 0.03
+    n_estimators: 200
+  merchant:
+    contamination: 0.04
+    n_estimators: 200
+
+ensemble:
+  enabled_at_maturity: HOT
+  cv_folds: 5
+  base_learners: [lgb, xgb, rf]
+  meta_learner: logistic_regression

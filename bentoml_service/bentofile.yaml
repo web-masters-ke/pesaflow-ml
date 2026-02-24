@@ -1,0 +1,27 @@
+service: "bentoml_service/service.py:svc"
+description: "Pesaflow ML — Fraud Detection, AML Scoring & Merchant Risk Engine"
+
+labels:
+  owner: pesaflow-ml-team
+  project: wasaa-pesaflow-ml
+  stage: production
+
+include:
+  - "bentoml_service/*.py"
+  - "models/**/*.py"
+  - "feature_engineering/**/*.py"
+  - "model_artifacts/**/*"
+  - "config/*.yaml"
+
+python:
+  requirements_txt: "requirements.txt"
+  lock_packages: false
+
+docker:
+  distro: debian
+  python_version: "3.11"
+  system_packages:
+    - libgomp1
+  env:
+    - MODEL_STORAGE_PATH=/home/bentoml/bento/src/model_artifacts
+    - ENVIRONMENT=production

@@ -1,0 +1,38 @@
+# Version control
+.git/
+.github/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environment
+.env
+.env.example
+*.env
+
+# Development
+tests/
+*.md
+LICENSE
+.vscode/
+.idea/
+
+# Docker (avoid recursive context)
+docker-compose.yml
+
+# Data & artifacts (mounted as volumes)
+model_artifacts/
+data/
+*.pkl
+*.joblib
+
+# Infrastructure (not needed in image)
+infrastructure/
+governance/
