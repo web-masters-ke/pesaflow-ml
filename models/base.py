@@ -154,6 +154,7 @@ class BaseModel(ABC):
             "feature_schema_version": self.feature_schema.version,
             "feature_schema_hash": self.feature_schema.schema_hash,
             "is_loaded": self._is_loaded,
+            "scoring_mode": "ml" if self._is_loaded else "heuristic",
             "load_timestamp": self._load_timestamp,
             "artifact_path": self._artifact_path,
             "calibrated": self._calibrator is not None,

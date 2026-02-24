@@ -245,14 +245,15 @@ CREATE TABLE IF NOT EXISTS aml_user_risk_profile (
 
 CREATE TABLE IF NOT EXISTS aml_cases (
     id UUID PRIMARY KEY,
-    entity_type VARCHAR(20) CHECK (entity_type IN ('USER', 'TRANSACTION')),
+    entity_type VARCHAR(20) CHECK (entity_type IN ('USER', 'TRANSACTION', 'MERCHANT')),
     entity_id UUID NOT NULL,
-    trigger_reason VARCHAR(100),
+    trigger_reason VARCHAR(500),
     risk_score NUMERIC(5,4),
     priority VARCHAR(20),
-    status VARCHAR(20) CHECK (status IN ('OPEN', 'UNDER_REVIEW', 'ESCALATED', 'CLOSED')),
+    status VARCHAR(30) CHECK (status IN ('OPEN', 'INVESTIGATING', 'ESCALATED', 'CLOSED_FALSE_POSITIVE', 'CLOSED_CONFIRMED', 'CLOSED_INCONCLUSIVE')),
     assigned_to UUID,
-    analyst_notes TEXT,
+    notes TEXT,
+    resolution VARCHAR(500),
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ
 );

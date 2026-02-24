@@ -76,6 +76,7 @@ class ServiceContainer:
                 self.settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://"),
                 min_size=5,
                 max_size=self.settings.DB_POOL_SIZE,
+                server_settings={"search_path": self.settings.DATABASE_SCHEMA + ",public"},
             )
             logger.info("Database pool initialized")
         except Exception as e:

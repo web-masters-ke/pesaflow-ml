@@ -14,6 +14,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      target: runtime
     container_name: pesaflow-ml
     ports:
       - "18743:8000"
@@ -92,7 +93,7 @@ services:
 
   # === Kafka (KRaft mode — ML-dedicated) ===
   kafka:
-    image: bitnami/kafka:3.7
+    image: bitnami/kafka:3.7.0
     container_name: pesaflow-ml-kafka
     ports:
       - "29094:9092"

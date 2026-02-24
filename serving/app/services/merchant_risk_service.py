@@ -240,7 +240,13 @@ class MerchantRiskService:
             return None
 
     async def _get_maturity(self) -> MaturityLevel:
-        """Get current maturity level for the merchant domain."""
+        """Get current maturity level for the merchant domain.
+
+        Returns COLD when model artifacts are not loaded, ensuring the system
+        uses rule-based scoring from day one instead of failing closed.
+        """
+        if not self._model.is_loaded:
+            return MaturityLevel.COLD
         if self._maturity:
             return await self._maturity.get_cached_level("merchant")
         return MaturityLevel.HOT

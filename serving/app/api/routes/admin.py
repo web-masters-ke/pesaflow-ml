@@ -251,14 +251,21 @@ async def get_feature_importance(
     container: ServiceContainer = Depends(get_container),
     _auth: dict = Depends(require_role("ML_ADMIN", "FRAUD_ANALYST")),
 ) -> dict:
-    if model_name == "fraud" and container.fraud_model and container.fraud_model.is_loaded:
-        return {"model": "fraud", "importance": container.fraud_model.get_feature_importance()}
-    elif model_name == "aml" and container.aml_model and container.aml_model.is_loaded:
-        return {"model": "aml", "importance": container.aml_model.get_feature_importance()}
-    elif model_name == "merchant" and container.merchant_model and container.merchant_model.is_loaded:
-        return {"model": "merchant", "importance": container.merchant_model.get_feature_importance()}
+    model_map = {
+        "fraud": container.fraud_model,
+        "aml": container.aml_model,
+        "merchant": container.merchant_model,
+    }
+    model = model_map.get(model_name)
+    if not model:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Model '{model_name}' not found")
 
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Model '{model_name}' not found or not loaded")
+    importance = model.get_feature_importance()
+    return {
+        "model": model_name,
+        "scoring_mode": "ml" if model.is_loaded else "heuristic",
+        "importance": importance,
+    }
 
 
 @router.get("/alerts", response_model=AlertLogResponse, summary="Get alert history")

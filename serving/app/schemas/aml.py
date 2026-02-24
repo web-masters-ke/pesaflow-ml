@@ -31,7 +31,7 @@ class AMLBatchScoreRequest(BaseModel):
 
 
 class AMLCaseCreateRequest(BaseModel):
-    entity_type: str = Field(..., pattern="^(USER|TRANSACTION)$")
+    entity_type: str = Field(..., pattern="^(USER|TRANSACTION|MERCHANT)$")
     entity_id: UUID
     risk_score: float = Field(..., ge=0.0, le=1.0)
     trigger_reason: str

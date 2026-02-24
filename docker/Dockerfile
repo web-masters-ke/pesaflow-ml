@@ -61,8 +61,8 @@ FROM runtime AS training
 
 USER root
 
-COPY requirements/training.txt /tmp/training.txt
-RUN pip install --no-cache-dir --timeout 300 -r /tmp/training.txt && rm /tmp/training.txt
+COPY requirements/ /tmp/requirements/
+RUN pip install --no-cache-dir --timeout 300 -r /tmp/requirements/training.txt && rm -rf /tmp/requirements/
 
 COPY training/ ./training/
 COPY airflow/   ./airflow/

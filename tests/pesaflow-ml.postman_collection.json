@@ -1,0 +1,1208 @@
+{
+  "info": {
+    "name": "PesaFlow ML API",
+    "_postman_id": "pesaflow-ml-collection",
+    "description": "Comprehensive test collection for PesaFlow ML fraud detection, AML scoring, and merchant risk APIs. Works with both heuristic (no model artifacts) and ML (trained models) modes.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:18743" },
+    { "key": "transaction_id", "value": "550e8400-e29b-41d4-a716-446655440000" },
+    { "key": "user_id", "value": "550e8400-e29b-41d4-a716-446655440001" },
+    { "key": "merchant_id", "value": "550e8400-e29b-41d4-a716-446655440005" },
+    { "key": "case_id", "value": "" },
+    { "key": "batch_job_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness Probe",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health/live"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Returns OK', () => { pm.expect(pm.response.json().status).to.eql('OK'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Readiness Probe",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health/ready"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Has models_loaded', () => { pm.expect(pm.response.json()).to.have.property('models_loaded'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Prometheus Metrics",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/metrics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Contains metric data', () => pm.expect(pm.response.text()).to.include('python_info'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fraud Scoring",
+      "item": [
+        {
+          "name": "Score Standard Transaction",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"{{transaction_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"amount\": 15000.50,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"TRANSFER\",\n  \"channel\": \"MOBILE_APP\",\n  \"device_fingerprint\": \"fp_device_123abc\",\n  \"ip_address\": \"192.168.1.100\",\n  \"geo_location\": {\n    \"country\": \"KE\",\n    \"lat\": -1.2921,\n    \"lng\": 36.8219\n  },\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"metadata\": {\"channel\": \"mobile_app\"}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has risk_score', () => pm.expect(json).to.have.property('risk_score'));",
+                  "pm.test('Has risk_level', () => pm.expect(json).to.have.property('risk_level'));",
+                  "pm.test('Has decision', () => pm.expect(json).to.have.property('decision'));",
+                  "pm.test('Has correlation_id', () => pm.expect(json).to.have.property('correlation_id'));",
+                  "pm.test('risk_score in range', () => pm.expect(json.risk_score).to.be.within(0, 1));",
+                  "pm.test('risk_score is not fail-closed 1.0', () => pm.expect(json.risk_score).to.be.below(1.0));",
+                  "pm.test('No MODEL_FAILURE override', () => pm.expect(json.rule_overrides).to.not.include('MODEL_FAILURE_FAIL_CLOSED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score High-Value Suspicious Transaction",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"a50e8400-e29b-41d4-a716-446655440099\",\n  \"user_id\": \"{{user_id}}\",\n  \"amount\": 999999.99,\n  \"currency\": \"USD\",\n  \"transaction_type\": \"WITHDRAWAL\",\n  \"channel\": \"WEB\",\n  \"device_fingerprint\": \"fp_unknown_device\",\n  \"ip_address\": \"203.0.113.42\",\n  \"geo_location\": {\n    \"country\": \"IR\",\n    \"lat\": 35.6892,\n    \"lng\": 51.389\n  },\n  \"metadata\": {\"new_device\": true}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Sanctioned country flagged', () => pm.expect(json.rule_overrides).to.include('SANCTIONED_COUNTRY'));",
+                  "pm.test('Decision is BLOCK', () => pm.expect(json.decision).to.eql('BLOCK'));",
+                  "pm.test('Has top_features for high-risk', () => pm.expect(json.top_features).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score Minimal Transaction",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"b50e8400-e29b-41d4-a716-446655440001\",\n  \"user_id\": \"{{user_id}}\",\n  \"amount\": 50.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"PAYMENT\",\n  \"channel\": \"MOBILE_APP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Low amount is low risk', () => pm.expect(json.risk_score).to.be.below(0.8));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score Micro Transaction",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"b50e8400-e29b-41d4-a716-446655440002\",\n  \"user_id\": \"{{user_id}}\",\n  \"amount\": 0.50,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"PAYMENT\",\n  \"channel\": \"USSD\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Micro amount is low risk', () => pm.expect(pm.response.json().risk_level).to.eql('LOW'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Batch Score Fraud",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score/batch",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactions\": [\n    {\n      \"transaction_id\": \"c50e8400-0001-41d4-a716-446655440001\",\n      \"user_id\": \"{{user_id}}\",\n      \"amount\": 500.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"PAYMENT\",\n      \"channel\": \"MOBILE_APP\"\n    },\n    {\n      \"transaction_id\": \"c50e8400-0002-41d4-a716-446655440002\",\n      \"user_id\": \"{{user_id}}\",\n      \"amount\": 75000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"TRANSFER\",\n      \"channel\": \"WEB\",\n      \"device_fingerprint\": \"fp_suspicious\",\n      \"ip_address\": \"10.0.0.1\"\n    },\n    {\n      \"transaction_id\": \"c50e8400-0003-41d4-a716-446655440003\",\n      \"user_id\": \"d60e8400-e29b-41d4-a716-446655440010\",\n      \"amount\": 250000.00,\n      \"currency\": \"USD\",\n      \"transaction_type\": \"WITHDRAWAL\",\n      \"channel\": \"WEB\",\n      \"geo_location\": {\"country\": \"SO\", \"lat\": 2.0469, \"lng\": 45.3182}\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has total count', () => pm.expect(json.total).to.eql(3));",
+                  "pm.test('Has results array', () => pm.expect(json.results).to.be.an('array'));",
+                  "pm.test('Each result has risk_score', () => { json.results.forEach(r => pm.expect(r).to.have.property('risk_score')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Fraud Explanation (no stored prediction — expect 404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/fraud/explanation/00000000-0000-0000-0000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 when no stored prediction', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Request — Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Has validation detail', () => pm.expect(pm.response.json()).to.have.property('detail'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Request — Negative Amount",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"{{transaction_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"amount\": -500.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"PAYMENT\",\n  \"channel\": \"MOBILE_APP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Request — Empty Body",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Request — Bad UUID Format",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"not-a-uuid\",\n  \"user_id\": \"also-not-a-uuid\",\n  \"amount\": 100.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"PAYMENT\",\n  \"channel\": \"MOBILE_APP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Request — Currency Too Long",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"{{transaction_id}}\",\n  \"user_id\": \"{{user_id}}\",\n  \"amount\": 100.00,\n  \"currency\": \"INVALID_CURRENCY\",\n  \"transaction_type\": \"PAYMENT\",\n  \"channel\": \"MOBILE_APP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AML Scoring",
+      "item": [
+        {
+          "name": "Score Standard AML Transaction",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/aml/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"d50e8400-e29b-41d4-a716-446655440010\",\n  \"user_id\": \"{{user_id}}\",\n  \"sender_wallet_id\": \"e50e8400-e29b-41d4-a716-446655440020\",\n  \"receiver_wallet_id\": \"e50e8400-e29b-41d4-a716-446655440021\",\n  \"amount\": 500000.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"TRANSFER\",\n  \"device_id\": \"device_abc123\",\n  \"ip_address\": \"192.168.1.50\",\n  \"geo_location\": {\n    \"country\": \"KE\",\n    \"lat\": -1.2921,\n    \"lng\": 36.8219\n  },\n  \"channel\": \"MOBILE_APP\",\n  \"metadata\": {\"source\": \"mobile_money\"}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has risk_score', () => pm.expect(json).to.have.property('risk_score'));",
+                  "pm.test('Has top_risk_factors', () => pm.expect(json).to.have.property('top_risk_factors'));",
+                  "pm.test('Has correlation_id', () => pm.expect(json).to.have.property('correlation_id'));",
+                  "pm.test('risk_score in range', () => pm.expect(json.risk_score).to.be.within(0, 1));",
+                  "pm.test('Not fail-closed', () => pm.expect(json.rule_overrides).to.not.include('FAIL_CLOSED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score Cross-Border High-Risk AML",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/aml/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"d50e8400-e29b-41d4-a716-446655440011\",\n  \"user_id\": \"{{user_id}}\",\n  \"sender_wallet_id\": \"e50e8400-e29b-41d4-a716-446655440020\",\n  \"receiver_wallet_id\": \"f60e8400-e29b-41d4-a716-446655440030\",\n  \"amount\": 2000000.00,\n  \"currency\": \"USD\",\n  \"transaction_type\": \"WIRE\",\n  \"device_id\": \"device_new_xyz\",\n  \"ip_address\": \"203.0.113.99\",\n  \"geo_location\": {\n    \"country\": \"KP\",\n    \"lat\": 39.0392,\n    \"lng\": 125.7625\n  },\n  \"channel\": \"WEB\",\n  \"metadata\": {\"cross_border\": true, \"recipient_country\": \"KP\"}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('High-risk country detected', () => pm.expect(json.risk_score).to.be.above(0.5));",
+                  "pm.test('Decision is BLOCK or REVIEW', () => pm.expect(['BLOCK', 'REVIEW']).to.include(json.decision));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score Minimal AML Transaction",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/aml/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transaction_id\": \"d50e8400-e29b-41d4-a716-446655440012\",\n  \"user_id\": \"{{user_id}}\",\n  \"amount\": 100.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"PAYMENT\",\n  \"channel\": \"MOBILE_APP\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Low amount is low risk', () => pm.expect(pm.response.json().risk_score).to.be.below(0.8));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Batch Score AML",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/aml/score/batch",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactions\": [\n    {\n      \"transaction_id\": \"d50e8400-0001-41d4-a716-446655440001\",\n      \"user_id\": \"{{user_id}}\",\n      \"amount\": 10000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"PAYMENT\",\n      \"channel\": \"MOBILE_APP\"\n    },\n    {\n      \"transaction_id\": \"d50e8400-0002-41d4-a716-446655440002\",\n      \"user_id\": \"d60e8400-e29b-41d4-a716-446655440010\",\n      \"amount\": 1500000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"TRANSFER\",\n      \"device_id\": \"device_unknown\",\n      \"ip_address\": \"10.0.0.99\",\n      \"channel\": \"API\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has total', () => pm.expect(json.total).to.eql(2));",
+                  "pm.test('Each result has risk_score', () => { json.results.forEach(r => pm.expect(r).to.have.property('risk_score')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "AML Explanation (no stored prediction — expect 404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/aml/explanation/00000000-0000-0000-0000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 when no stored prediction', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid AML — Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/aml/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Merchant Risk",
+      "item": [
+        {
+          "name": "Score Standard Merchant",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/merchant/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"transaction_id\": \"{{transaction_id}}\",\n  \"amount\": 2500.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"CARD_PAYMENT\",\n  \"channel\": \"POS\",\n  \"customer_id\": \"{{user_id}}\",\n  \"mcc_code\": \"5411\",\n  \"geo_location\": {\n    \"country\": \"KE\",\n    \"lat\": -1.2921,\n    \"lng\": 36.8219\n  },\n  \"metadata\": {\"business_type\": \"retail\"}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has merchant_tier', () => pm.expect(json).to.have.property('merchant_tier'));",
+                  "pm.test('Has risk_score', () => pm.expect(json).to.have.property('risk_score'));",
+                  "pm.test('Has correlation_id', () => pm.expect(json).to.have.property('correlation_id'));",
+                  "pm.test('risk_score in range', () => pm.expect(json.risk_score).to.be.within(0, 1));",
+                  "pm.test('Not fail-closed', () => pm.expect(json.rule_overrides).to.not.include('FAIL_CLOSED'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score High-Risk Gambling MCC Merchant",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/merchant/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant_id\": \"f70e8400-e29b-41d4-a716-446655440099\",\n  \"amount\": 950000.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"CARD_PAYMENT\",\n  \"channel\": \"ONLINE\",\n  \"mcc_code\": \"7995\",\n  \"geo_location\": {\n    \"country\": \"NG\",\n    \"lat\": 6.5244,\n    \"lng\": 3.3792\n  },\n  \"metadata\": {\"business_type\": \"gambling\", \"chargebacks_90d\": 15}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has risk_score', () => pm.expect(json).to.have.property('risk_score'));",
+                  "pm.test('Has top_risk_factors', () => pm.expect(json).to.have.property('top_risk_factors'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Score Minimal Merchant (just merchant_id)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/merchant/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchant_id\": \"{{merchant_id}}\",\n  \"amount\": 100.00,\n  \"currency\": \"KES\",\n  \"transaction_type\": \"CARD_PAYMENT\",\n  \"channel\": \"POS\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Batch Score Merchants",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/merchant/score/batch",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchants\": [\n    {\n      \"merchant_id\": \"{{merchant_id}}\",\n      \"amount\": 1000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"CARD_PAYMENT\",\n      \"channel\": \"POS\",\n      \"mcc_code\": \"5411\"\n    },\n    {\n      \"merchant_id\": \"f70e8400-e29b-41d4-a716-446655440099\",\n      \"amount\": 500000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"CARD_PAYMENT\",\n      \"channel\": \"ONLINE\",\n      \"mcc_code\": \"7995\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Total is 2', () => pm.expect(pm.response.json().total).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Merchant Explanation (no stored prediction — expect 404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/merchant/explanation/00000000-0000-0000-0000-000000000000"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 when no stored prediction', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Invalid Merchant — Missing merchant_id",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/merchant/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100.00,\n  \"currency\": \"KES\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "AML Case Management",
+      "item": [
+        {
+          "name": "Create AML Case",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/aml/cases",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entity_type\": \"USER\",\n  \"entity_id\": \"{{user_id}}\",\n  \"risk_score\": 0.85,\n  \"trigger_reason\": \"Sanctions match found in screening — high-value cross-border transfer\",\n  \"priority\": \"CRITICAL\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has case_id', () => pm.expect(json).to.have.property('case_id'));",
+                  "pm.test('Status is OPEN', () => pm.expect(json.status).to.eql('OPEN'));",
+                  "if (json.case_id) pm.collectionVariables.set('case_id', json.case_id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create TRANSACTION Case",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/aml/cases",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"entity_type\": \"TRANSACTION\",\n  \"entity_id\": \"{{transaction_id}}\",\n  \"risk_score\": 0.72,\n  \"trigger_reason\": \"Structuring detected — multiple sub-threshold transfers within 24h\",\n  \"priority\": \"HIGH\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has case_id', () => pm.expect(pm.response.json()).to.have.property('case_id'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List AML Cases",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/aml/cases?status=OPEN&limit=10&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "aml", "cases"],
+              "query": [
+                { "key": "status", "value": "OPEN" },
+                { "key": "limit", "value": "10" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has cases array', () => pm.expect(json).to.have.property('cases'));",
+                  "pm.test('Has total', () => pm.expect(json).to.have.property('total'));",
+                  "pm.test('Cases is not empty', () => pm.expect(json.cases.length).to.be.above(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get AML Case Detail",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/aml/cases/{{case_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has case_id', () => pm.expect(json).to.have.property('case_id'));",
+                  "pm.test('Has entity_type', () => pm.expect(json).to.have.property('entity_type'));",
+                  "pm.test('Has risk_score', () => pm.expect(json).to.have.property('risk_score'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Case — Set to INVESTIGATING",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/aml/cases/{{case_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INVESTIGATING\",\n  \"assigned_to\": \"a10e8400-e29b-41d4-a716-446655440200\",\n  \"notes\": \"Investigation in progress — reviewing transaction patterns for last 90 days\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status updated', () => pm.expect(pm.response.json().status).to.eql('INVESTIGATING'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Case — Close as False Positive",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/aml/cases/{{case_id}}",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CLOSED_FALSE_POSITIVE\",\n  \"notes\": \"Confirmed legitimate business transaction after review\",\n  \"resolution\": \"Transaction verified with merchant — normal business volume spike during holiday season\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Status is closed', () => pm.expect(pm.response.json().status).to.eql('CLOSED_FALSE_POSITIVE'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "List Models",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/admin/models"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has models', () => pm.expect(json).to.have.property('models'));",
+                  "pm.test('Has fraud model', () => pm.expect(json.models).to.have.property('fraud'));",
+                  "pm.test('Has aml model', () => pm.expect(json.models).to.have.property('aml'));",
+                  "pm.test('Has merchant model', () => pm.expect(json.models).to.have.property('merchant'));",
+                  "pm.test('Shows scoring_mode', () => pm.expect(json.models.fraud).to.have.property('scoring_mode'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Thresholds",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/admin/thresholds"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has fraud thresholds', () => pm.expect(json).to.have.property('fraud'));",
+                  "pm.test('Has aml thresholds', () => pm.expect(json).to.have.property('aml'));",
+                  "pm.test('Has merchant thresholds', () => pm.expect(json).to.have.property('merchant'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Fraud Thresholds",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/ml/admin/thresholds",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"model_type\": \"fraud\",\n  \"thresholds\": {\n    \"approve_below\": 0.55,\n    \"review_above\": 0.78,\n    \"block_above\": 0.92\n  },\n  \"reason\": \"Q1 2024 performance review — adjusting for lower false positive rate\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has previous', () => pm.expect(json).to.have.property('previous'));",
+                  "pm.test('Has updated', () => pm.expect(json).to.have.property('updated'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Threshold History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ml/admin/thresholds/history?model_type=fraud&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ml", "admin", "thresholds", "history"],
+              "query": [
+                { "key": "model_type", "value": "fraud" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feature Importance — Fraud (heuristic mode)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/admin/feature-importance/fraud"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has model name', () => pm.expect(json.model).to.eql('fraud'));",
+                  "pm.test('Has scoring_mode', () => pm.expect(json).to.have.property('scoring_mode'));",
+                  "pm.test('Has importance map', () => pm.expect(json).to.have.property('importance'));",
+                  "pm.test('Importance has expected features', () => pm.expect(json.importance).to.have.property('historical_fraud_flag'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feature Importance — AML (heuristic mode)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/admin/feature-importance/aml"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has model name', () => pm.expect(json.model).to.eql('aml'));",
+                  "pm.test('Has scoring_mode', () => pm.expect(json).to.have.property('scoring_mode'));",
+                  "pm.test('Sanctions proximity is top weight', () => pm.expect(json.importance.sanctions_proximity_score).to.be.above(0.1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feature Importance — Merchant (heuristic mode)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/admin/feature-importance/merchant"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has model name', () => pm.expect(json.model).to.eql('merchant'));",
+                  "pm.test('Chargeback rate is top weight', () => pm.expect(json.importance.chargeback_rate_90d).to.be.above(0.1));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Feature Importance — Invalid Model (404)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/admin/feature-importance/nonexistent"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404 for unknown model', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Alerts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ml/admin/alerts?limit=10",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ml", "admin", "alerts"],
+              "query": [
+                { "key": "limit", "value": "10" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Batch & Export",
+      "item": [
+        {
+          "name": "Batch Rescore Fraud",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/batch/fraud/rescore",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactions\": [\n    {\n      \"transaction_id\": \"e50e8400-0001-41d4-a716-446655440001\",\n      \"user_id\": \"{{user_id}}\",\n      \"amount\": 5000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"PAYMENT\",\n      \"channel\": \"MOBILE_APP\"\n    },\n    {\n      \"transaction_id\": \"e50e8400-0002-41d4-a716-446655440002\",\n      \"user_id\": \"{{user_id}}\",\n      \"amount\": 120000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"TRANSFER\",\n      \"channel\": \"WEB\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has job_id or results', () => pm.expect(json).to.satisfy(j => j.job_id || j.results));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Batch Rescore AML",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/batch/aml/rescore",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"transactions\": [\n    {\n      \"transaction_id\": \"e50e8400-0003-41d4-a716-446655440003\",\n      \"user_id\": \"{{user_id}}\",\n      \"amount\": 50000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"WIRE\",\n      \"channel\": \"MOBILE_APP\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Batch Rescore Merchant",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/batch/merchant/rescore",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"merchants\": [\n    {\n      \"merchant_id\": \"{{merchant_id}}\",\n      \"amount\": 10000.00,\n      \"currency\": \"KES\",\n      \"transaction_type\": \"CARD_PAYMENT\",\n      \"channel\": \"POS\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export SAR Report",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ml/batch/export/sar?start_date=2024-01-01T00:00:00&end_date=2025-12-31T23:59:59&export_format=JSON&min_risk_score=0.75",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ml", "batch", "export", "sar"],
+              "query": [
+                { "key": "start_date", "value": "2024-01-01T00:00:00" },
+                { "key": "end_date", "value": "2025-12-31T23:59:59" },
+                { "key": "export_format", "value": "JSON" },
+                { "key": "min_risk_score", "value": "0.75" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Export STR Report",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ml/batch/export/str?start_date=2024-01-01T00:00:00&end_date=2025-12-31T23:59:59&export_format=CSV",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ml", "batch", "export", "str"],
+              "query": [
+                { "key": "start_date", "value": "2024-01-01T00:00:00" },
+                { "key": "end_date", "value": "2025-12-31T23:59:59" },
+                { "key": "export_format", "value": "CSV" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Edge Cases",
+      "item": [
+        {
+          "name": "404 — Nonexistent Route",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/nonexistent"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 — Invalid JSON Body",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/fraud/score",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "not-valid-json"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 422', () => pm.response.to.have.status(422));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

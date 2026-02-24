@@ -1,0 +1,90 @@
+# =============================================================================
+# Pesaflow ML — Standalone Full-Stack Test
+# =============================================================================
+# Overrides docker-compose.yml to run self-contained (no external backend).
+# Adds a main Postgres, rewires all service hostnames, runs migrations.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.test.yml up --build -d
+# =============================================================================
+
+services:
+  # === Main Postgres (stands in for the backend's pesaflow-postgres) ===
+  main-postgres:
+    image: postgres:16-alpine
+    container_name: pesaflow-main-postgres
+    environment:
+      POSTGRES_USER: pesaflow
+      POSTGRES_PASSWORD: pesaflow_secure_2024
+      POSTGRES_DB: pesaflow
+    volumes:
+      - main_postgres_data:/var/lib/postgresql/data
+    networks:
+      - pesaflow-network
+      - ml-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pesaflow -d pesaflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # === Run DB migrations after main-postgres is healthy ===
+  migrate:
+    image: postgres:16-alpine
+    container_name: pesaflow-ml-migrate
+    depends_on:
+      main-postgres:
+        condition: service_healthy
+    volumes:
+      - ./migrations:/migrations:ro
+    entrypoint: /bin/sh
+    command: >
+      -c "
+        for f in /migrations/*.sql; do
+          echo \"=== Running $$f ===\"
+          PGPASSWORD=pesaflow_secure_2024 psql -h pesaflow-main-postgres -U pesaflow -d pesaflow -f \"$$f\"
+        done
+        echo '=== All migrations complete ==='
+      "
+    networks:
+      - pesaflow-network
+      - ml-internal
+
+  # === Override ML service to point to local infra ===
+  pesaflow-ml:
+    depends_on:
+      main-postgres:
+        condition: service_healthy
+      ml-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - LOG_LEVEL=INFO
+      # Point to local main-postgres (instead of external backend)
+      - DATABASE_URL=postgresql+asyncpg://pesaflow:pesaflow_secure_2024@pesaflow-main-postgres:5432/pesaflow
+      - DATABASE_SYNC_URL=postgresql://pesaflow:pesaflow_secure_2024@pesaflow-main-postgres:5432/pesaflow
+      - DATABASE_SCHEMA=ai_schema
+      # Point to local Redis
+      - REDIS_URL=redis://pesaflow-ml-redis:6379/0
+      # Point to local Kafka
+      - KAFKA_BOOTSTRAP_SERVERS=pesaflow-ml-kafka:29092
+      - MLFLOW_TRACKING_URI=http://pesaflow-ml-mlflow:5000
+      - MODEL_STORAGE_PATH=/app/model_artifacts
+      - JWT_SECRET=dev-secret-change-in-production
+
+volumes:
+  main_postgres_data:
+
+# Override external network to be local
+networks:
+  pesaflow-network:
+    external: false
+    driver: bridge
+  ml-internal:
+    driver: bridge
