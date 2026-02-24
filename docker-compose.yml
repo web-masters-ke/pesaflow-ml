@@ -219,7 +219,7 @@ networks:
   # Shared with pesa-flow-backend
   pesaflow-network:
     external: true
-    name: pesa-flow-backend_pesaflow-network
+    name: pesaflow_pesaflow-network
   # Internal ML network
   ml-internal:
     driver: bridge

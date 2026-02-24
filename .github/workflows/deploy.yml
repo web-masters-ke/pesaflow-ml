@@ -1,0 +1,48 @@
+name: Deploy Pesaflow ML
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    if: github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Deploy to Server via SSM
+        run: |
+          aws ssm send-command \
+            --instance-ids "${{ secrets.EC2_INSTANCE_ID }}" \
+            --document-name "AWS-RunShellScript" \
+            --timeout-seconds 600 \
+            --parameters 'commands=[
+              "echo \"Starting Pesaflow ML deployment...\"",
+              "docker image prune -f 2>/dev/null || true",
+              "rm -rf /opt/pesaflow-ml-new",
+              "git clone --depth=1 https://github.com/web-masters-ke/pesaflow-ml.git /opt/pesaflow-ml-new",
+              "cp /opt/pesaflow-ml/.env /opt/pesaflow-ml-new/.env 2>/dev/null || true",
+              "cd /opt/pesaflow-ml-new && git log --oneline -1",
+              "cd /opt/pesaflow-ml && docker compose down 2>/dev/null || true",
+              "rm -rf /opt/pesaflow-ml-old",
+              "mv /opt/pesaflow-ml /opt/pesaflow-ml-old 2>/dev/null || true",
+              "mv /opt/pesaflow-ml-new /opt/pesaflow-ml",
+              "cd /opt/pesaflow-ml && docker compose build --no-cache 2>&1 | tail -20",
+              "cd /opt/pesaflow-ml && docker compose up -d 2>&1",
+              "sleep 60",
+              "docker ps --filter name=pesaflow-ml --format \"table {{.Names}}\t{{.Status}}\"",
+              "curl -sf http://localhost:18743/health/live && echo \" ML API healthy\" || echo \"ML API not ready yet\"",
+              "echo \"Pesaflow ML deployment complete\""
+            ]' \
+            --region ${{ secrets.AWS_REGION }}
