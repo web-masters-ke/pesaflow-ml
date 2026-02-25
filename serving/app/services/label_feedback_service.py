@@ -28,7 +28,6 @@ from serving.app.schemas.labels import (
     LabelSubmitResponse,
 )
 
-
 # Mapping from prediction domain to DB table
 _DOMAIN_TABLE = {
     Domain.FRAUD: "ml_predictions",

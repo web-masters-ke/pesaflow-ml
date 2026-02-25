@@ -14,7 +14,6 @@ from training.co_training.label_transfer import LabelTransferEngine
 from training.semi_supervised.base_ssl_trainer import BaseSSLTrainer, SSLConfig
 from training.semi_supervised.pseudo_label_store import PseudoLabelStore
 
-
 _DOMAIN_TABLE = {
     "fraud": "ml_predictions",
     "aml": "aml_predictions",

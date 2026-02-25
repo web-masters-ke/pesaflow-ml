@@ -2,8 +2,9 @@
 
 from datetime import datetime, timedelta
 
-from airflow import DAG
 from airflow.operators.python import BranchPythonOperator, PythonOperator
+
+from airflow import DAG
 
 default_args = {
     "owner": "wasaa_pesaflow_ml",

@@ -8,11 +8,7 @@ import bentoml
 import numpy as np
 from loguru import logger
 
-from feature_engineering.feature_registry import (
-    AML_FEATURE_SCHEMA,
-    FRAUD_FEATURE_SCHEMA,
-    MERCHANT_FEATURE_SCHEMA,
-)
+from feature_engineering.feature_registry import AML_FEATURE_SCHEMA, FRAUD_FEATURE_SCHEMA, MERCHANT_FEATURE_SCHEMA
 
 # === Model Runners with Adaptive Batching ===
 

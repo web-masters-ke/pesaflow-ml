@@ -18,12 +18,7 @@ from feature_engineering.aml_features import AMLFeatureExtractor
 from models.aml.aml_model import AMLRiskModel
 from monitoring.data_maturity import DataMaturityDetector, MaturityLevel
 from monitoring.metrics import PesaflowMetrics
-from serving.app.schemas.aml import (
-    AMLExplanationResponse,
-    AMLScoreRequest,
-    AMLScoreResponse,
-    SanctionsScreenResult,
-)
+from serving.app.schemas.aml import AMLExplanationResponse, AMLScoreRequest, AMLScoreResponse, SanctionsScreenResult
 from serving.app.schemas.common import Decision, FeatureContribution, RiskLevel
 from serving.app.services.decision_engine import AMLDecisionEngine, AMLThresholdConfig
 from serving.app.services.resilience import get_circuit_breaker, with_retry

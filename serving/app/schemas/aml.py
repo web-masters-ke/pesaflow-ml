@@ -6,7 +6,6 @@ from pydantic import BaseModel, Field
 
 from .common import Decision, FeatureContribution, GeoLocation, RiskLevel
 
-
 # === Request Schemas ===
 
 

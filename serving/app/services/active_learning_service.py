@@ -30,7 +30,6 @@ from serving.app.schemas.labels import (
     Domain,
 )
 
-
 # Decision thresholds per domain for uncertainty calculation
 _DOMAIN_THRESHOLDS = {
     Domain.FRAUD: [0.3, 0.7, 0.9],

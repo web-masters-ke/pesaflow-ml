@@ -15,7 +15,6 @@ from feature_engineering.feature_registry import (
     FeatureSchema,
 )
 
-
 # Hardcoded fallback defaults when zero data exists
 HARDCODED_DEFAULTS: dict[str, dict[str, float]] = {
     "fraud": {
