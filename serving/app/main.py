@@ -8,7 +8,16 @@ from loguru import logger
 from starlette.responses import JSONResponse
 
 from serving.app.api.dependencies import _container
-from serving.app.api.routes import admin, aml_scoring, batch, case_management, fraud_scoring, health, merchant_risk
+from serving.app.api.routes import (
+    admin,
+    aml_scoring,
+    batch,
+    case_management,
+    fraud_scoring,
+    health,
+    labels,
+    merchant_risk,
+)
 from serving.app.middleware.request_id import RequestIDMiddleware
 from serving.app.middleware.security import SecurityHeadersMiddleware
 from serving.app.settings import get_settings
@@ -79,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(merchant_risk.router, prefix="/api/v1/ml")
     app.include_router(case_management.router, prefix="/api/v1")
     app.include_router(batch.router, prefix="/api/v1/ml")
+    app.include_router(labels.router, prefix="/api/v1/ml")
     app.include_router(admin.router, prefix="/api/v1/ml")
 
     # === Global exception handler ===

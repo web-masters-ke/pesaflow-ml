@@ -12,10 +12,10 @@ from loguru import logger
 class MaturityLevel(str, Enum):
     """Data maturity levels that drive system behavior."""
 
-    COLD = "COLD"        # <100 labeled samples, <70% feature coverage → pure rules
+    COLD = "COLD"  # <100 labeled samples, <70% feature coverage → pure rules
     WARMING = "WARMING"  # 100-1000 samples, 70-90% coverage → hybrid
-    WARM = "WARM"        # 1000-10000 samples, >90% coverage → full ML
-    HOT = "HOT"          # >10000 samples, stable distributions → ensemble
+    WARM = "WARM"  # 1000-10000 samples, >90% coverage → full ML
+    HOT = "HOT"  # >10000 samples, stable distributions → ensemble
 
 
 @dataclass
@@ -57,13 +57,13 @@ MATURITY_THRESHOLDS = {
     "warming_max_coverage": 0.90,
     "psi_stable_threshold": 0.1,
     "positive_rate_min": 0.005,  # Flag if below 0.5%
-    "positive_rate_max": 0.50,   # Flag if above 50%
+    "positive_rate_max": 0.50,  # Flag if above 50%
 }
 
 # Expected positive rates per domain
 DOMAIN_EXPECTED_RATES = {
-    "fraud": (0.01, 0.10),     # 1-10% fraud
-    "aml": (0.005, 0.08),      # 0.5-8% suspicious
+    "fraud": (0.01, 0.10),  # 1-10% fraud
+    "aml": (0.005, 0.08),  # 0.5-8% suspicious
     "merchant": (0.01, 0.10),  # 1-10% risky
 }
 
@@ -142,8 +142,10 @@ class DataMaturityDetector:
         # Store in Redis for real-time access
         await self._store_maturity(report)
 
-        logger.info(f"Maturity assessment for {domain}: {level.value} "
-                     f"(samples={sample_count}, coverage={feature_coverage:.2%})")
+        logger.info(
+            f"Maturity assessment for {domain}: {level.value} "
+            f"(samples={sample_count}, coverage={feature_coverage:.2%})"
+        )
 
         return report
 
@@ -186,14 +188,10 @@ class DataMaturityDetector:
         # Positive rate checks
         expected_min, expected_max = DOMAIN_EXPECTED_RATES.get(domain, (0.01, 0.10))
         if positive_rate < expected_min and sample_count > 0:
-            details["warnings"].append(
-                f"Positive rate {positive_rate:.2%} below expected minimum {expected_min:.2%}"
-            )
+            details["warnings"].append(f"Positive rate {positive_rate:.2%} below expected minimum {expected_min:.2%}")
             details["recommendations"].append("Verify labeling pipeline is working correctly")
         elif positive_rate > expected_max:
-            details["warnings"].append(
-                f"Positive rate {positive_rate:.2%} above expected maximum {expected_max:.2%}"
-            )
+            details["warnings"].append(f"Positive rate {positive_rate:.2%} above expected maximum {expected_max:.2%}")
             details["recommendations"].append("Check for labeling bias or data quality issues")
 
         # Feature coverage
@@ -288,6 +286,7 @@ class DataMaturityDetector:
             coverage_data = await self._redis.get(f"pesaflow:features:{domain}:coverage_stats")
             if coverage_data:
                 import json
+
                 stats = json.loads(coverage_data)
                 total_features = stats.get("total", 1)
                 covered = stats.get("non_default", 0)
@@ -353,6 +352,7 @@ class DataMaturityDetector:
 
         try:
             import json
+
             key = f"pesaflow:maturity:{report.domain}"
             await self._redis.set(key, json.dumps(report.to_dict()), ex=self._check_interval * 2)
             await self._redis.set(f"{key}:level", report.level.value, ex=self._check_interval * 2)

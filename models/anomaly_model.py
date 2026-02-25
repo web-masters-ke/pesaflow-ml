@@ -123,11 +123,13 @@ class AnomalyModel(BaseModel):
             perturbed_score = self._model.decision_function(perturbed)[0]
             impact = base_score - perturbed_score  # Positive = feature contributes to anomaly
 
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": float(impact),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": float(impact),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
         return contributions[:10]

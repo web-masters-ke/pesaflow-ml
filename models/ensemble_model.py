@@ -141,6 +141,7 @@ class EnsembleModel(BaseModel):
 
     def _manual_predict(self, arr: np.ndarray) -> list[float]:
         """Run base learners in parallel, then feed to meta-learner."""
+
         def _predict_base(name_model: tuple[str, Any]) -> np.ndarray:
             _, model = name_model
             return model.predict_proba(arr)[:, 1]
@@ -185,11 +186,13 @@ class EnsembleModel(BaseModel):
         feature_names = self.feature_schema.feature_names
         contributions = []
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": float(values[i]),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": float(values[i]),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
         return contributions[:10]

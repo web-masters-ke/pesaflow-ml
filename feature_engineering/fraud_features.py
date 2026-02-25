@@ -58,9 +58,7 @@ class FraudFeatureExtractor:
         if self._db:
             try:
                 async with self._db.acquire() as conn:
-                    row = await conn.fetchrow(
-                        "SELECT * FROM feature_store_user WHERE user_id = $1", user_id
-                    )
+                    row = await conn.fetchrow("SELECT * FROM feature_store_user WHERE user_id = $1", user_id)
                     if row:
                         features = dict(row)
                         # Cache for next time
@@ -149,13 +147,13 @@ class FraudFeatureExtractor:
             last_loc = await self._get_last_known_location(user_id)
             if last_loc:
                 geo_distance = self._haversine_distance(
-                    request.geo_location.lat, request.geo_location.lng,
-                    last_loc[0], last_loc[1],
+                    request.geo_location.lat,
+                    request.geo_location.lng,
+                    last_loc[0],
+                    last_loc[1],
                 )
             # Store current location for next transaction
-            await self._store_last_known_location(
-                user_id, request.geo_location.lat, request.geo_location.lng
-            )
+            await self._store_last_known_location(user_id, request.geo_location.lat, request.geo_location.lng)
 
         return {
             "time_of_day": time_of_day,

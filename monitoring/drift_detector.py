@@ -230,9 +230,7 @@ class DriftDetector:
             # Top drifting features (by PSI)
             drifting = [(name, psi_val) for name, psi_val in feature_psi.items() if psi_val > self.psi_threshold]
             drifting.sort(key=lambda x: x[1], reverse=True)
-            results["top_drifting_features"] = [
-                {"feature": name, "psi": psi_val} for name, psi_val in drifting[:10]
-            ]
+            results["top_drifting_features"] = [{"feature": name, "psi": psi_val} for name, psi_val in drifting[:10]]
             if drifting:
                 results["alerts"].append(
                     f"{len(drifting)} features drifting: {', '.join(name for name, _ in drifting[:5])}"
@@ -243,9 +241,7 @@ class DriftDetector:
             conf_result = self.check_confidence_drift(current_confidences)
             results["confidence_drift"] = conf_result
             if conf_result["confidence_drift_alert"]:
-                results["alerts"].append(
-                    f"Confidence dropping: {conf_result['confidence_drop']:.4f} below baseline"
-                )
+                results["alerts"].append(f"Confidence dropping: {conf_result['confidence_drop']:.4f} below baseline")
 
         # Label delay monitoring
         if avg_label_delay_hours is not None:
@@ -257,12 +253,14 @@ class DriftDetector:
                 )
 
         # Recommend retraining if any alert triggered
-        results["retrain_recommended"] = any([
-            results["psi_alert"],
-            results["wasserstein_alert"],
-            results["accuracy_alert"],
-            results["fraud_rate_alert"],
-        ])
+        results["retrain_recommended"] = any(
+            [
+                results["psi_alert"],
+                results["wasserstein_alert"],
+                results["accuracy_alert"],
+                results["fraud_rate_alert"],
+            ]
+        )
 
         if results["retrain_recommended"]:
             logger.warning(f"Drift detected for {model_version}: {results['alerts']}")

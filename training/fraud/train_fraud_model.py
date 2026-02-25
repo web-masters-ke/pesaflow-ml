@@ -159,7 +159,9 @@ class FraudModelTrainer:
         self._log_to_mlflow(model, metrics, metadata, version)
 
         logger.info(f"Fraud model training complete: {version}")
-        logger.info(f"ROC-AUC: {metrics['roc_auc']:.4f}, Precision: {metrics['precision']:.4f}, Recall: {metrics['recall']:.4f}")
+        logger.info(
+            f"ROC-AUC: {metrics['roc_auc']:.4f}, Precision: {metrics['precision']:.4f}, Recall: {metrics['recall']:.4f}"
+        )
 
         return metrics
 
@@ -195,8 +197,7 @@ class FraudModelTrainer:
 
             X_res, y_res = sampler.fit_resample(X, y)
             logger.info(
-                f"Oversampling ({strategy}): {len(X)} → {len(X_res)} samples "
-                f"(positive: {y.sum()} → {y_res.sum()})"
+                f"Oversampling ({strategy}): {len(X)} → {len(X_res)} samples " f"(positive: {y.sum()} → {y_res.sum()})"
             )
             return X_res, y_res
         except ImportError:

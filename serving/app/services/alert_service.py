@@ -72,7 +72,9 @@ class AlertService:
             logger.warning("Slack webhook URL not configured")
             return False
 
-        emoji = {"CRITICAL": ":rotating_light:", "WARNING": ":warning:", "INFO": ":information_source:"}.get(severity, ":bell:")
+        emoji = {"CRITICAL": ":rotating_light:", "WARNING": ":warning:", "INFO": ":information_source:"}.get(
+            severity, ":bell:"
+        )
 
         payload = {
             "text": f"{emoji} *{subject}*",
@@ -88,7 +90,10 @@ class AlertService:
                 {
                     "type": "context",
                     "elements": [
-                        {"type": "mrkdwn", "text": f"*Severity:* {severity} | *Time:* {datetime.utcnow().isoformat()}Z"},
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Severity:* {severity} | *Time:* {datetime.utcnow().isoformat()}Z",
+                        },
                     ],
                 },
             ],

@@ -143,11 +143,13 @@ class MerchantRiskModel(BaseModel):
         feature_names = self.feature_schema.feature_names
         contributions = []
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": float(values[i]),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": float(values[i]),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
         return contributions[:10]
@@ -262,11 +264,13 @@ class MerchantRiskModel(BaseModel):
 
         contributions = []
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": impacts.get(name, 0.0),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": impacts.get(name, 0.0),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
         return contributions[:10]

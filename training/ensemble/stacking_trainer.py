@@ -221,9 +221,7 @@ class StackingEnsembleTrainer:
 
         logger.info(f"Dataset: {len(df)} samples, {y.sum()} positive ({y.mean()*100:.2f}%)")
 
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
-        )
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
         # Build stacking classifier
         estimators = [
@@ -234,9 +232,7 @@ class StackingEnsembleTrainer:
 
         stacking_model = StackingClassifier(
             estimators=estimators,
-            final_estimator=LogisticRegression(
-                C=1.0, max_iter=1000, random_state=42
-            ),
+            final_estimator=LogisticRegression(C=1.0, max_iter=1000, random_state=42),
             cv=cv_folds,
             passthrough=False,
             n_jobs=-1,
@@ -339,12 +335,14 @@ class StackingEnsembleTrainer:
             with mlflow.start_run(run_name=f"{self.domain}-ensemble-{version}"):
                 flat_metrics = {k: v for k, v in metrics.items() if not isinstance(v, dict)}
                 mlflow.log_metrics(flat_metrics)
-                mlflow.log_params({
-                    "domain": self.domain,
-                    "model_type": "stacking_ensemble",
-                    "base_learners": "lgb,xgb,rf",
-                    "meta_learner": "logistic_regression",
-                })
+                mlflow.log_params(
+                    {
+                        "domain": self.domain,
+                        "model_type": "stacking_ensemble",
+                        "base_learners": "lgb,xgb,rf",
+                        "meta_learner": "logistic_regression",
+                    }
+                )
                 mlflow.set_tag("model_version", version)
                 mlflow.set_tag("model_type", f"{self.domain}_ensemble")
         except Exception as e:

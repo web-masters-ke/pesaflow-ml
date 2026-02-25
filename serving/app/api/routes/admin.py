@@ -165,7 +165,9 @@ async def update_thresholds(
         }
 
     else:
-        raise HTTPException(status_code=404, detail=f"Model type '{request.model_type}' not found or service not loaded")
+        raise HTTPException(
+            status_code=404, detail=f"Model type '{request.model_type}' not found or service not loaded"
+        )
 
     # Audit log
     audit_id = uuid.uuid4()

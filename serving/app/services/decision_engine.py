@@ -106,9 +106,7 @@ class FraudDecisionEngine:
 
         return Decision.APPROVE, RiskLevel.LOW, override_reasons
 
-    def _adjust_thresholds_for_confidence(
-        self, confidence: float, maturity: MaturityLevel
-    ) -> dict[str, float]:
+    def _adjust_thresholds_for_confidence(self, confidence: float, maturity: MaturityLevel) -> dict[str, float]:
         """Adjust thresholds based on confidence and maturity.
 
         Low confidence + COLD/WARMING → stricter (lower) thresholds to catch more.

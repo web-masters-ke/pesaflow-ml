@@ -78,9 +78,7 @@ class AMLScoringService:
             features_array = feature_vector.to_array()
 
             # Step 4: Maturity-aware scoring
-            risk_score, confidence = await self._score_by_maturity(
-                features_array, maturity
-            )
+            risk_score, confidence = await self._score_by_maturity(features_array, maturity)
 
             # Step 5: Apply country risk weight
             if request.geo_location and request.geo_location.country.upper() in {"IR", "KP", "SY", "AF", "YE"}:
@@ -123,8 +121,8 @@ class AMLScoringService:
             if decision != Decision.APPROVE:
                 top_features = self._compute_inline_shap(features_array)
 
-            # Step 11: Store prediction
-            await self._store_prediction(
+            # Step 11: Store prediction (capture prediction_id)
+            prediction_id = await self._store_prediction(
                 request=request,
                 risk_score=risk_score,
                 risk_level=risk_level,
@@ -134,9 +132,9 @@ class AMLScoringService:
                 latency_ms=latency_ms,
             )
 
-            # Step 12: Generate case if needed
+            # Step 12: Generate case if needed (with prediction_id for label propagation)
             if risk_level in (RiskLevel.HIGH, RiskLevel.CRITICAL):
-                await self._create_case(request, risk_score, risk_level, rule_overrides)
+                await self._create_case(request, risk_score, risk_level, rule_overrides, prediction_id=prediction_id)
 
             # Step 13: Update velocity counters
             await self._features.update_velocity_counters(str(request.user_id), request.amount)
@@ -174,9 +172,7 @@ class AMLScoringService:
                 correlation_id=correlation_id,
             )
 
-    async def _score_by_maturity(
-        self, features_array: list[float], maturity: MaturityLevel
-    ) -> tuple[float, float]:
+    async def _score_by_maturity(self, features_array: list[float], maturity: MaturityLevel) -> tuple[float, float]:
         """Score based on data maturity level, returns (risk_score, confidence).
 
         Blending strategy — progressively trusts supervised ML as data matures:
@@ -200,9 +196,7 @@ class AMLScoringService:
             return blended, 0.3
 
         if maturity == MaturityLevel.WARM:
-            score, confidence = self._model.predict_with_confidence(
-                features_array, maturity_confidence=0.7
-            )
+            score, confidence = self._model.predict_with_confidence(features_array, maturity_confidence=0.7)
             anomaly_score = self._get_anomaly_score(features_array)
             blended = 0.7 * score + 0.3 * anomaly_score
             return blended, confidence
@@ -212,26 +206,24 @@ class AMLScoringService:
             score = self._ensemble_model.predict(features_array)
             return score, 0.95
 
-        score, confidence = self._model.predict_with_confidence(
-            features_array, maturity_confidence=1.0
-        )
+        score, confidence = self._model.predict_with_confidence(features_array, maturity_confidence=1.0)
         return score, confidence
 
     def _rule_based_score(self, features: list[float]) -> float:
         """Compute heuristic AML risk score from features when ML is not available."""
         score = 0.2
         if len(features) >= 22:
-            if features[1] > 10:   # velocity_1h
+            if features[1] > 10:  # velocity_1h
                 score += 0.2
-            if features[16] > 0:   # high_risk_country_flag
+            if features[16] > 0:  # high_risk_country_flag
                 score += 0.25
-            if features[20] > 0.5: # structuring_score_24h
+            if features[20] > 0.5:  # structuring_score_24h
                 score += 0.2
-            if features[21] > 0:   # rapid_drain_flag
+            if features[21] > 0:  # rapid_drain_flag
                 score += 0.15
-            if features[14] > 0:   # circular_transfer_flag
+            if features[14] > 0:  # circular_transfer_flag
                 score += 0.15
-            if features[17] > 0.3: # sanctions_proximity_score
+            if features[17] > 0.3:  # sanctions_proximity_score
                 score += 0.2
         return max(0.0, min(1.0, score))
 
@@ -249,8 +241,7 @@ class AMLScoringService:
         try:
             shap_values = self._model.get_shap_values(features_array)
             return [
-                FeatureContribution(feature=sv["feature"], value=sv["value"], impact=sv["impact"])
-                for sv in shap_values
+                FeatureContribution(feature=sv["feature"], value=sv["value"], impact=sv["impact"]) for sv in shap_values
             ]
         except Exception as e:
             logger.warning(f"Inline SHAP computation failed: {e}")
@@ -288,7 +279,9 @@ class AMLScoringService:
                     return None
 
                 feature_snapshot = row.get("feature_snapshot", {})
-                features_array = list(feature_snapshot.values()) if isinstance(feature_snapshot, dict) else feature_snapshot
+                features_array = (
+                    list(feature_snapshot.values()) if isinstance(feature_snapshot, dict) else feature_snapshot
+                )
 
                 shap_values = self._model.get_shap_values(features_array)
                 top_features = [
@@ -356,11 +349,21 @@ class AMLScoringService:
         return factors[:10]
 
     @with_retry(max_attempts=3, backoff_base=0.1, backoff_max=2.0)
-    async def _store_prediction(self, request: AMLScoreRequest, risk_score: float, risk_level: RiskLevel, decision: Decision, feature_vector: Any, top_risk_factors: list[str], latency_ms: int) -> None:
-        """Persist AML prediction."""
+    async def _store_prediction(
+        self,
+        request: AMLScoreRequest,
+        risk_score: float,
+        risk_level: RiskLevel,
+        decision: Decision,
+        feature_vector: Any,
+        top_risk_factors: list[str],
+        latency_ms: int,
+    ) -> str | None:
+        """Persist AML prediction. Returns prediction_id for case linkage."""
         if not self._db:
-            return
+            return None
 
+        prediction_id = str(uuid.uuid4())
         try:
             async with self._db.acquire() as conn:
                 await conn.execute(
@@ -370,7 +373,7 @@ class AMLScoringService:
                      decision, top_risk_factors, feature_snapshot, threshold_version)
                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
                     """,
-                    str(uuid.uuid4()),
+                    prediction_id,
                     str(request.transaction_id),
                     str(request.user_id),
                     self._model.version,
@@ -381,11 +384,20 @@ class AMLScoringService:
                     feature_vector.model_dump(),
                     self._decision.thresholds.version,
                 )
+            return prediction_id
         except Exception as e:
             logger.error(f"Failed to store AML prediction: {e}")
+            return None
 
     @with_retry(max_attempts=3, backoff_base=0.1, backoff_max=2.0)
-    async def _create_case(self, request: AMLScoreRequest, risk_score: float, risk_level: RiskLevel, triggers: list[str]) -> None:
+    async def _create_case(
+        self,
+        request: AMLScoreRequest,
+        risk_score: float,
+        risk_level: RiskLevel,
+        triggers: list[str],
+        prediction_id: str | None = None,
+    ) -> None:
         """Auto-generate AML case for high-risk transactions."""
         if not self._db:
             return
@@ -396,8 +408,8 @@ class AMLScoringService:
                 await conn.execute(
                     """
                     INSERT INTO aml_cases
-                    (id, entity_type, entity_id, trigger_reason, risk_score, priority, status)
-                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                    (id, entity_type, entity_id, trigger_reason, risk_score, priority, status, prediction_id)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                     """,
                     str(uuid.uuid4()),
                     "TRANSACTION",
@@ -406,6 +418,7 @@ class AMLScoringService:
                     risk_score,
                     risk_level.value,
                     "OPEN",
+                    prediction_id,
                 )
                 logger.info(f"AML case created for transaction {request.transaction_id}")
         except Exception as e:

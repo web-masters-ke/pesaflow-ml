@@ -68,9 +68,7 @@ class MerchantRiskService:
             features_array = feature_vector.to_array()
 
             # Step 2: Maturity-aware scoring
-            risk_score, confidence = await self._score_by_maturity(
-                features_array, maturity, feature_vector
-            )
+            risk_score, confidence = await self._score_by_maturity(features_array, maturity, feature_vector)
 
             # Step 3: Apply decision engine (confidence-aware)
             decision, risk_level, merchant_tier, rule_overrides = self._decision.evaluate(
@@ -184,9 +182,7 @@ class MerchantRiskService:
             return blended, 0.3
 
         if maturity == MaturityLevel.WARM:
-            score, confidence = self._model.predict_with_confidence(
-                features_array, maturity_confidence=0.7
-            )
+            score, confidence = self._model.predict_with_confidence(features_array, maturity_confidence=0.7)
             anomaly_score = self._get_anomaly_score(features_array)
             blended = 0.7 * score + 0.3 * anomaly_score
             return blended, confidence
@@ -196,9 +192,7 @@ class MerchantRiskService:
             score = self._ensemble_model.predict(features_array)
             return score, 0.95
 
-        score, confidence = self._model.predict_with_confidence(
-            features_array, maturity_confidence=1.0
-        )
+        score, confidence = self._model.predict_with_confidence(features_array, maturity_confidence=1.0)
         return score, confidence
 
     def _rule_based_score(self, fv: MerchantFeatureVector) -> float:
@@ -232,8 +226,7 @@ class MerchantRiskService:
         try:
             shap_values = self._model.get_shap_values(features_array)
             return [
-                FeatureContribution(feature=sv["feature"], value=sv["value"], impact=sv["impact"])
-                for sv in shap_values
+                FeatureContribution(feature=sv["feature"], value=sv["value"], impact=sv["impact"]) for sv in shap_values
             ]
         except Exception as e:
             logger.warning(f"Inline SHAP computation failed: {e}")
@@ -271,7 +264,9 @@ class MerchantRiskService:
                     return None
 
                 feature_snapshot = row.get("feature_snapshot", {})
-                features_array = list(feature_snapshot.values()) if isinstance(feature_snapshot, dict) else feature_snapshot
+                features_array = (
+                    list(feature_snapshot.values()) if isinstance(feature_snapshot, dict) else feature_snapshot
+                )
 
                 shap_values = self._model.get_shap_values(features_array)
                 top_features = [

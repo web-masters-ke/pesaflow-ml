@@ -75,9 +75,7 @@ class FraudScoringService:
             features_array = feature_vector.to_array()
 
             # Step 3: Maturity-aware scoring
-            risk_score, confidence = await self._score_by_maturity(
-                features_array, maturity, overrides
-            )
+            risk_score, confidence = await self._score_by_maturity(features_array, maturity, overrides)
 
             # Step 4: Apply decision engine (confidence-aware)
             decision, risk_level, rule_overrides = self._decision.evaluate(
@@ -244,8 +242,7 @@ class FraudScoringService:
         try:
             shap_values = self._model.get_shap_values(features_array)
             return [
-                FeatureContribution(feature=sv["feature"], value=sv["value"], impact=sv["impact"])
-                for sv in shap_values
+                FeatureContribution(feature=sv["feature"], value=sv["value"], impact=sv["impact"]) for sv in shap_values
             ]
         except Exception as e:
             logger.warning(f"Inline SHAP computation failed: {e}")
@@ -315,7 +312,9 @@ class FraudScoringService:
             blacklisted_device=self._sanctions.is_blacklisted_device(request.device_fingerprint),
             blacklisted_ip=self._sanctions.is_blacklisted_ip(request.ip_address),
             blacklisted_user=self._sanctions.is_blacklisted_user(str(request.user_id)),
-            sanctioned_country=request.geo_location.country.upper() in {"IR", "KP", "SY", "CU"} if request.geo_location else False,
+            sanctioned_country=(
+                request.geo_location.country.upper() in {"IR", "KP", "SY", "CU"} if request.geo_location else False
+            ),
             velocity_anomaly=await self._check_velocity_anomaly(str(request.user_id)),
             new_account_high_amount=False,  # Would check account age vs amount
         )

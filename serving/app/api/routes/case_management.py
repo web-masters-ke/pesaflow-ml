@@ -4,6 +4,7 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from loguru import logger
 
 from serving.app.api.dependencies import ServiceContainer, get_container
 from serving.app.middleware.auth import require_role
@@ -14,6 +15,8 @@ from serving.app.schemas.aml import (
     AMLCaseResponse,
     AMLCaseUpdateRequest,
 )
+from serving.app.schemas.labels import Domain, LabelSource
+from serving.app.services.label_feedback_service import LabelFeedbackService
 
 router = APIRouter(prefix="/aml/cases", tags=["AML Case Management"])
 
@@ -129,6 +132,32 @@ async def update_case(
 
         # Re-fetch updated record
         row = await conn.fetchrow("SELECT * FROM aml_cases WHERE id = $1", case_id)
+
+    # Auto-propagate label on case closure
+    if request.status in ("CLOSED_CONFIRMED", "CLOSED_FALSE_POSITIVE"):
+        try:
+            label = 1 if request.status == "CLOSED_CONFIRMED" else 0
+            prediction_id = row.get("prediction_id")
+            if prediction_id:
+                svc = LabelFeedbackService(
+                    db_pool=container.db_pool,
+                    redis_client=container.redis_client,
+                )
+                await svc.submit_label(
+                    prediction_id=str(prediction_id),
+                    domain=Domain.AML,
+                    label=label,
+                    label_source=LabelSource.SAR_CONFIRMED if label == 1 else LabelSource.MANUAL_REVIEW,
+                    reason=f"Auto-propagated from case {case_id} closure ({request.status})",
+                )
+                # Mark case as label-propagated
+                async with container.db_pool.acquire() as conn2:
+                    await conn2.execute(
+                        "UPDATE aml_cases SET label_propagated = TRUE WHERE id = $1",
+                        case_id,
+                    )
+        except Exception as e:
+            logger.warning(f"Label propagation from case closure failed: {e}")
 
     return AMLCaseDetailResponse(
         case_id=row["id"],

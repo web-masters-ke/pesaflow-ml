@@ -15,19 +15,19 @@ from models.base import BaseModel
 # Feature indices match FRAUD_FEATURE_SCHEMA order.
 # Weights represent domain-expert estimates of each feature's contribution to fraud risk.
 _FRAUD_HEURISTIC_WEIGHTS: dict[str, dict] = {
-    "avg_transaction_amount_7d": {"index": 0, "weight": 0.0},   # Used as baseline for ratio
-    "transaction_velocity_1h":   {"index": 1, "weight": 0.15, "threshold": 5, "max_val": 20},
-    "transaction_velocity_24h":  {"index": 2, "weight": 0.08, "threshold": 15, "max_val": 50},
+    "avg_transaction_amount_7d": {"index": 0, "weight": 0.0},  # Used as baseline for ratio
+    "transaction_velocity_1h": {"index": 1, "weight": 0.15, "threshold": 5, "max_val": 20},
+    "transaction_velocity_24h": {"index": 2, "weight": 0.08, "threshold": 15, "max_val": 50},
     "failed_login_attempts_24h": {"index": 3, "weight": 0.10, "threshold": 2, "max_val": 10},
-    "account_age_days":          {"index": 4, "weight": -0.10, "threshold": 30, "invert": True},
-    "historical_fraud_flag":     {"index": 5, "weight": 0.20},
-    "device_risk_score":         {"index": 6, "weight": 0.12},
-    "device_fraud_count":        {"index": 7, "weight": 0.10, "threshold": 1, "max_val": 5},
-    "distinct_user_count":       {"index": 8, "weight": 0.05, "threshold": 3, "max_val": 10},
-    "amount":                    {"index": 9, "weight": 0.10},   # Ratio vs avg
+    "account_age_days": {"index": 4, "weight": -0.10, "threshold": 30, "invert": True},
+    "historical_fraud_flag": {"index": 5, "weight": 0.20},
+    "device_risk_score": {"index": 6, "weight": 0.12},
+    "device_fraud_count": {"index": 7, "weight": 0.10, "threshold": 1, "max_val": 5},
+    "distinct_user_count": {"index": 8, "weight": 0.05, "threshold": 3, "max_val": 10},
+    "amount": {"index": 9, "weight": 0.10},  # Ratio vs avg
     "geo_distance_from_last_tx": {"index": 10, "weight": 0.08, "threshold": 500, "max_val": 5000},
-    "time_of_day":               {"index": 11, "weight": 0.04},  # Night hours
-    "currency_risk":             {"index": 12, "weight": 0.08},
+    "time_of_day": {"index": 11, "weight": 0.04},  # Night hours
+    "currency_risk": {"index": 12, "weight": 0.08},
 }
 
 
@@ -150,11 +150,13 @@ class FraudDetectionModel(BaseModel):
         feature_names = self.feature_schema.feature_names
         contributions = []
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": float(values[i]),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": float(values[i]),
+                }
+            )
 
         # Sort by absolute impact descending
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
@@ -163,10 +165,7 @@ class FraudDetectionModel(BaseModel):
     def get_feature_importance(self) -> dict[str, float]:
         """Get model-level feature importance."""
         if not self._is_loaded:
-            return {
-                name: abs(cfg.get("weight", 0.0))
-                for name, cfg in _FRAUD_HEURISTIC_WEIGHTS.items()
-            }
+            return {name: abs(cfg.get("weight", 0.0)) for name, cfg in _FRAUD_HEURISTIC_WEIGHTS.items()}
 
         if hasattr(self._model, "feature_importance"):
             importance = self._model.feature_importance(importance_type="gain")
@@ -276,11 +275,13 @@ class FraudDetectionModel(BaseModel):
         impacts = self._compute_heuristic_impacts(features)
 
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": impacts.get(name, 0.0),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": impacts.get(name, 0.0),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
         return contributions[:10]

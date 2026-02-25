@@ -37,13 +37,15 @@ class GraphRiskService:
                     tgt = str(row["target_merchant_id"])
                     nodes.add(src)
                     nodes.add(tgt)
-                    edge_list.append({
-                        "source": src,
-                        "target": tgt,
-                        "type": row["edge_type"],
-                        "weight": float(row["weight"]),
-                        "shared_count": row["shared_entity_count"],
-                    })
+                    edge_list.append(
+                        {
+                            "source": src,
+                            "target": tgt,
+                            "type": row["edge_type"],
+                            "weight": float(row["weight"]),
+                            "shared_count": row["shared_entity_count"],
+                        }
+                    )
 
                 return {"nodes": list(nodes), "edges": edge_list}
         except Exception as e:
@@ -144,10 +146,7 @@ class GraphRiskService:
                 if not neighbors[node]:
                     continue
 
-                neighbor_risk = sum(
-                    risk_scores.get(n, 0.0) * w * propagation_decay
-                    for n, w in neighbors[node]
-                )
+                neighbor_risk = sum(risk_scores.get(n, 0.0) * w * propagation_decay for n, w in neighbors[node])
                 max_neighbor_risk = max(
                     (risk_scores.get(n, 0.0) * w for n, w in neighbors[node]),
                     default=0.0,

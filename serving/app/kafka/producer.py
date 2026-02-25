@@ -120,3 +120,26 @@ async def publish_merchant_blocked(merchant_id: str, block_data: dict) -> None:
         key=merchant_id,
         value=block_data,
     )
+
+
+# === Label Feedback Events ===
+
+
+async def publish_label_updated(domain: str, prediction_id: str, label_data: dict) -> None:
+    """Publish label update event to domain-specific label topic."""
+    topic_map = {
+        "fraud": "fraud.labels.updated",
+        "aml": "aml.labels.updated",
+        "merchant": "merchant.labels.updated",
+    }
+    topic = topic_map.get(domain)
+    if not topic:
+        logger.warning(f"Unknown domain for label publish: {domain}")
+        return
+
+    producer = await get_producer()
+    await producer.send_and_wait(
+        topic,
+        key=prediction_id,
+        value=label_data,
+    )

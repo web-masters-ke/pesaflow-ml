@@ -74,9 +74,7 @@ class MerchantModelTrainer:
         y = df[target_col].values
 
         # Train/test split
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=0.2, random_state=42, stratify=y
-        )
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
         # Optuna hyperparameter optimization
         if run_optuna:
@@ -143,8 +141,7 @@ class MerchantModelTrainer:
 
             X_res, y_res = sampler.fit_resample(X, y)
             logger.info(
-                f"Oversampling ({strategy}): {len(X)} → {len(X_res)} samples "
-                f"(positive: {y.sum()} → {y_res.sum()})"
+                f"Oversampling ({strategy}): {len(X)} → {len(X_res)} samples " f"(positive: {y.sum()} → {y_res.sum()})"
             )
             return X_res, y_res
         except ImportError:

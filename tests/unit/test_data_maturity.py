@@ -146,20 +146,28 @@ class TestAlphaAndConfidence:
 class TestBuildDetails:
     def test_low_positive_rate_warning(self):
         detector = DataMaturityDetector()
-        details = detector._build_details("fraud", sample_count=1000, positive_rate=0.001, feature_coverage=0.9, label_delay=24)
+        details = detector._build_details(
+            "fraud", sample_count=1000, positive_rate=0.001, feature_coverage=0.9, label_delay=24
+        )
         assert any("below expected" in w for w in details["warnings"])
 
     def test_high_positive_rate_warning(self):
         detector = DataMaturityDetector()
-        details = detector._build_details("fraud", sample_count=1000, positive_rate=0.5, feature_coverage=0.9, label_delay=24)
+        details = detector._build_details(
+            "fraud", sample_count=1000, positive_rate=0.5, feature_coverage=0.9, label_delay=24
+        )
         assert any("above expected" in w for w in details["warnings"])
 
     def test_label_delay_warning(self):
         detector = DataMaturityDetector()
-        details = detector._build_details("fraud", sample_count=1000, positive_rate=0.05, feature_coverage=0.9, label_delay=100)
+        details = detector._build_details(
+            "fraud", sample_count=1000, positive_rate=0.05, feature_coverage=0.9, label_delay=100
+        )
         assert any("Label delay" in w for w in details["warnings"])
 
     def test_low_coverage_recommendation(self):
         detector = DataMaturityDetector()
-        details = detector._build_details("fraud", sample_count=1000, positive_rate=0.05, feature_coverage=0.5, label_delay=24)
+        details = detector._build_details(
+            "fraud", sample_count=1000, positive_rate=0.05, feature_coverage=0.5, label_delay=24
+        )
         assert any("coverage" in r.lower() for r in details["recommendations"])

@@ -235,15 +235,11 @@ class PopulationPriors:
             async with self._db.acquire() as conn:
                 # Fetch recent feature snapshots
                 if domain == "fraud":
-                    rows = await conn.fetch(
-                        f"SELECT feature_data FROM {table} "
-                        "ORDER BY created_at DESC LIMIT 10000"
-                    )
+                    rows = await conn.fetch(f"SELECT feature_data FROM {table} " "ORDER BY created_at DESC LIMIT 10000")
                     data_key = "feature_data"
                 else:
                     rows = await conn.fetch(
-                        f"SELECT feature_snapshot FROM {table} "
-                        "ORDER BY created_at DESC LIMIT 10000"
+                        f"SELECT feature_snapshot FROM {table} " "ORDER BY created_at DESC LIMIT 10000"
                     )
                     data_key = "feature_snapshot"
 

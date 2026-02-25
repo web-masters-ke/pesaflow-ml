@@ -227,3 +227,134 @@ ensemble:
   cv_folds: 5
   base_learners: [lgb, xgb, rf]
   meta_learner: logistic_regression
+
+# =============================================================================
+# Semi-Supervised Learning Configuration
+# =============================================================================
+semi_supervised:
+  enabled: true
+  activation_maturity: WARMING  # Minimum maturity to activate SSL
+
+  self_training:
+    enabled: true
+    max_iterations: 10
+    convergence_threshold: 0.001
+    positive_confidence_threshold: 0.95
+    negative_confidence_threshold: 0.05
+    threshold_tightening_per_iter: 0.02
+    sample_weight_pseudo: 0.5
+
+  label_propagation:
+    enabled: true
+    n_neighbors: 10
+    alpha: 0.2
+    propagation_confidence_threshold: 0.7
+
+  consistency_regularization:
+    enabled: true
+    n_augmentations: 5
+    noise_scale: 0.1
+    dropout_rate: 0.1
+    consistency_weight_max: 1.0
+    ramp_up_epochs: 5
+    n_epochs: 10
+
+  mixmatch:
+    enabled: true
+    n_augmentations: 3
+    temperature: 0.5
+    mixup_alpha: 0.75
+    noise_scale: 0.1
+    dropout_rate: 0.15
+
+  safety_guardrails:
+    max_pseudo_labeled_ratio: 3.0
+    labeled_holdout_fraction: 0.2
+    min_auc_improvement: 0.005
+    pseudo_label_accuracy_floor: 0.85
+    label_flip_rate_ceiling: 0.10
+    auto_rollback_on_auc_drop: true
+
+# =============================================================================
+# Co-Training Configuration
+# =============================================================================
+co_training:
+  enabled: true
+  activation_maturity: WARM  # Minimum maturity to activate co-training
+
+  multi_view:
+    enabled: true
+    max_rounds: 5
+    top_k_per_round: 100
+    agreement_threshold: 0.9
+    feature_views:
+      fraud:
+        transaction_view: [amount, geo_distance_from_last_tx, time_of_day, currency_risk]
+        user_view: [avg_transaction_amount_7d, transaction_velocity_1h, transaction_velocity_24h, failed_login_attempts_24h, account_age_days, historical_fraud_flag]
+        device_view: [device_risk_score, device_fraud_count, distinct_user_count]
+      aml:
+        transaction_view: [amount, velocity_1h, velocity_24h, total_volume_24h, avg_amount_30d, std_amount_30d, time_of_day, is_cross_border]
+        entity_view: [account_age_days, device_count_30d, ip_count_30d, new_device_flag, kyc_completeness_score]
+        network_view: [network_risk_score, circular_transfer_flag, shared_device_cluster_size, high_risk_country_flag, sanctions_proximity_score, ip_country_mismatch, historical_structuring_flag, structuring_score_24h, rapid_drain_flag]
+      merchant:
+        velocity_view: [transaction_count_1h, transaction_count_24h, transaction_volume_24h, unique_customers_24h]
+        aggregate_view: [avg_transaction_amount_30d, std_transaction_amount_30d, chargeback_rate_90d, refund_rate_90d, account_age_days]
+        risk_view: [fraud_transaction_rate, high_risk_customer_ratio, cross_border_ratio, velocity_spike_flag, mcc_risk_score, avg_customer_risk_score]
+
+  cross_domain:
+    enabled: true
+    max_transfer_ratio: 0.20  # Max cross-domain labels as % of target domain labeled data
+    transfer_rules:
+      - source: fraud
+        target: aml
+        source_label: 1
+        transferred_label: 1
+        confidence_decay: 0.8
+        description: "Confirmed fraud → AML suspicious"
+      - source: fraud
+        target: merchant
+        source_label: 1
+        transferred_label: 1
+        confidence_decay: 0.6
+        description: "Confirmed fraud → merchant risk signal"
+      - source: aml
+        target: merchant
+        source_label: 1
+        transferred_label: 1
+        confidence_decay: 0.7
+        description: "AML suspicious → merchant risk signal"
+      - source: merchant
+        target: fraud
+        source_label: 1
+        transferred_label: 1
+        confidence_decay: 0.5
+        description: "Blocked merchant → fraud risk signal"
+
+  tri_training:
+    enabled: true
+    max_rounds: 8
+    max_error_rate: 0.10
+    bootstrap_ratio: 0.8
+    classifiers: [lgb, xgb, rf]
+
+# =============================================================================
+# Active Learning Configuration
+# =============================================================================
+active_learning:
+  enabled: true
+  default_strategies:
+    fraud: DISAGREEMENT
+    aml: UNCERTAINTY
+    merchant: ENTROPY
+  default_budgets:
+    fraud:
+      daily: 100
+      weekly: 500
+    aml:
+      daily: 80
+      weekly: 400
+    merchant:
+      daily: 50
+      weekly: 250
+  queue_expiry_hours: 48
+  refresh_interval_minutes: 15

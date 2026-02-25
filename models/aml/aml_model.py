@@ -163,11 +163,13 @@ class AMLRiskModel(BaseModel):
         feature_names = self.feature_schema.feature_names
         contributions = []
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": float(values[i]),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": float(values[i]),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
         return contributions[:10]
@@ -307,11 +309,13 @@ class AMLRiskModel(BaseModel):
 
         contributions = []
         for i, name in enumerate(feature_names):
-            contributions.append({
-                "feature": name,
-                "value": float(features[i]),
-                "impact": impacts.get(name, 0.0),
-            })
+            contributions.append(
+                {
+                    "feature": name,
+                    "value": float(features[i]),
+                    "impact": impacts.get(name, 0.0),
+                }
+            )
 
         contributions.sort(key=lambda x: abs(x["impact"]), reverse=True)
         return contributions[:10]
@@ -338,7 +342,9 @@ class AMLRiskModel(BaseModel):
         impacts["is_cross_border"] = 0.08 if features[7] > 0 else 0.0
 
         age = features[8]
-        impacts["account_age_days"] = 0.10 if (age < 14 and total_vol > 5000) else (0.03 if age < 30 else -0.02 if age > 365 else 0.0)
+        impacts["account_age_days"] = (
+            0.10 if (age < 14 and total_vol > 5000) else (0.03 if age < 30 else -0.02 if age > 365 else 0.0)
+        )
 
         impacts["device_count_30d"] = 0.05 if features[9] > 5 else 0.0
         impacts["ip_count_30d"] = 0.05 if features[10] > 10 else 0.0

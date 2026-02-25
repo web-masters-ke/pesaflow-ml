@@ -57,14 +57,16 @@ class TestFraudFeatureExtractor:
     async def test_extract_with_cached_user_features(self):
         from feature_engineering.fraud_features import FraudFeatureExtractor
 
-        cached_data = json.dumps({
-            "avg_transaction_amount_7d": 3000.0,
-            "transaction_velocity_1h": 5,
-            "transaction_velocity_24h": 20,
-            "failed_login_attempts_24h": 0,
-            "account_age_days": 180,
-            "historical_fraud_flag": 0,
-        })
+        cached_data = json.dumps(
+            {
+                "avg_transaction_amount_7d": 3000.0,
+                "transaction_velocity_1h": 5,
+                "transaction_velocity_24h": 20,
+                "failed_login_attempts_24h": 0,
+                "account_age_days": 180,
+                "historical_fraud_flag": 0,
+            }
+        )
         redis_client = AsyncMock()
         redis_client.get = AsyncMock(return_value=cached_data)
         extractor = FraudFeatureExtractor(redis_client=redis_client)

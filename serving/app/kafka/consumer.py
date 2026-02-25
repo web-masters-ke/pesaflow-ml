@@ -25,13 +25,15 @@ _consumer_task: asyncio.Task | None = None
 
 
 async def start_kafka_consumer() -> None:
-    """Start Kafka consumer for transaction events."""
+    """Start Kafka consumer for transaction events and label feedback."""
     global _consumer, _consumer_task
 
     settings = get_settings()
     _consumer = AIOKafkaConsumer(
         "wallet.transactions.created",
         "transactions.created",
+        "fraud.chargebacks",
+        "partner.feedback",
         bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
         group_id=settings.KAFKA_GROUP_ID,
         client_id=f"{settings.KAFKA_CLIENT_ID}-consumer",
@@ -41,7 +43,9 @@ async def start_kafka_consumer() -> None:
     )
 
     await _consumer.start()
-    logger.info("Kafka consumer started, listening on wallet.transactions.created, transactions.created")
+    logger.info(
+        "Kafka consumer started, listening on wallet.transactions.created, transactions.created, fraud.chargebacks, partner.feedback"
+    )
 
     _consumer_task = asyncio.create_task(_consume_loop())
 
@@ -80,7 +84,16 @@ async def _consume_loop() -> None:
 
 
 async def _process_transaction_event(topic: str, data: dict) -> None:
-    """Process a single transaction event — run fraud + AML scoring."""
+    """Process a single transaction event — run fraud + AML scoring, or label feedback."""
+
+    # Handle label feedback topics
+    if topic == "fraud.chargebacks":
+        await _process_chargeback_event(data)
+        return
+    if topic == "partner.feedback":
+        await _process_partner_feedback_event(data)
+        return
+
     transaction_id = data.get("transaction_id") or data.get("id")
     if not transaction_id:
         logger.warning(f"Received message without transaction_id on {topic}")
@@ -164,7 +177,12 @@ async def _process_transaction_event(topic: str, data: dict) -> None:
 
     # === Merchant Risk Scoring ===
     merchant_id = data.get("merchant_id")
-    if merchant_id and _container.merchant_risk_service and _container.merchant_model and _container.merchant_model.is_loaded:
+    if (
+        merchant_id
+        and _container.merchant_risk_service
+        and _container.merchant_model
+        and _container.merchant_model.is_loaded
+    ):
         try:
             merchant_request = MerchantScoreRequest(
                 merchant_id=merchant_id,
@@ -194,3 +212,65 @@ async def _process_transaction_event(topic: str, data: dict) -> None:
 
         except Exception as e:
             logger.error(f"Merchant scoring failed for {merchant_id}: {e}")
+
+
+async def _process_chargeback_event(data: dict) -> None:
+    """Process chargeback events as fraud labels (label=1)."""
+    from serving.app.schemas.labels import Domain, LabelSource
+    from serving.app.services.label_feedback_service import LabelFeedbackService
+
+    transaction_id = data.get("transaction_id") or data.get("id")
+    if not transaction_id or not _container.db_pool:
+        return
+
+    try:
+        svc = LabelFeedbackService(db_pool=_container.db_pool, redis_client=_container.redis_client)
+
+        # Find the prediction for this transaction
+        async with _container.db_pool.acquire() as conn:
+            row = await conn.fetchrow(
+                "SELECT id FROM ml_predictions WHERE transaction_id = $1 ORDER BY created_at DESC LIMIT 1",
+                str(transaction_id),
+            )
+
+        if row:
+            await svc.submit_label(
+                prediction_id=str(row["id"]),
+                domain=Domain.FRAUD,
+                label=1,
+                label_source=LabelSource.CHARGEBACK_FEED,
+                reason=f"Chargeback received: {data.get('reason', 'N/A')}",
+            )
+            logger.info(f"Chargeback label applied for transaction {transaction_id}")
+    except Exception as e:
+        logger.error(f"Failed to process chargeback for {transaction_id}: {e}")
+
+
+async def _process_partner_feedback_event(data: dict) -> None:
+    """Process partner feedback as labels."""
+    from serving.app.schemas.labels import Domain, LabelSource
+    from serving.app.services.label_feedback_service import LabelFeedbackService
+
+    prediction_id = data.get("prediction_id")
+    domain_str = data.get("domain")
+    label = data.get("label")
+
+    if prediction_id is None or domain_str is None or label is None:
+        logger.warning("Partner feedback missing required fields")
+        return
+    if not _container.db_pool:
+        return
+
+    try:
+        domain = Domain(domain_str)
+        svc = LabelFeedbackService(db_pool=_container.db_pool, redis_client=_container.redis_client)
+        await svc.submit_label(
+            prediction_id=str(prediction_id),
+            domain=domain,
+            label=int(label),
+            label_source=LabelSource.PARTNER_FEEDBACK,
+            reason=data.get("reason"),
+        )
+        logger.info(f"Partner feedback label applied for prediction {prediction_id}")
+    except Exception as e:
+        logger.error(f"Failed to process partner feedback: {e}")

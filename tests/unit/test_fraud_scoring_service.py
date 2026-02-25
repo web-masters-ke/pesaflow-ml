@@ -56,9 +56,7 @@ def _build_service(
 
     from serving.app.services.decision_engine import FraudDecisionEngine, ThresholdConfig
 
-    decision_engine = FraudDecisionEngine(
-        ThresholdConfig(approve_below=0.60, review_above=0.75, block_above=0.90)
-    )
+    decision_engine = FraudDecisionEngine(ThresholdConfig(approve_below=0.60, review_above=0.75, block_above=0.90))
 
     sanctions_service = MagicMock()
     sanctions_service.is_blacklisted_device.return_value = False

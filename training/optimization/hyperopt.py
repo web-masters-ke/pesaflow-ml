@@ -142,23 +142,27 @@ class OptunaTuner:
 
         # Add fixed params
         if self.algorithm == "lightgbm":
-            self.best_params.update({
-                "objective": "binary",
-                "metric": "auc",
-                "boosting_type": "gbdt",
-                "scale_pos_weight": scale_pos_weight,
-                "random_state": 42,
-                "verbose": -1,
-            })
+            self.best_params.update(
+                {
+                    "objective": "binary",
+                    "metric": "auc",
+                    "boosting_type": "gbdt",
+                    "scale_pos_weight": scale_pos_weight,
+                    "random_state": 42,
+                    "verbose": -1,
+                }
+            )
         else:
-            self.best_params.update({
-                "objective": "binary:logistic",
-                "eval_metric": "auc",
-                "scale_pos_weight": scale_pos_weight,
-                "random_state": 42,
-                "use_label_encoder": False,
-                "verbosity": 0,
-            })
+            self.best_params.update(
+                {
+                    "objective": "binary:logistic",
+                    "eval_metric": "auc",
+                    "scale_pos_weight": scale_pos_weight,
+                    "random_state": 42,
+                    "use_label_encoder": False,
+                    "verbosity": 0,
+                }
+            )
 
         logger.info(f"Best ROC-AUC: {self.best_score:.4f}")
         logger.info(f"Best params: {json.dumps(self.best_params, indent=2, default=str)}")
@@ -187,7 +191,8 @@ class OptunaTuner:
                     verbose=-1,
                 )
                 model.fit(
-                    X_train, y_train,
+                    X_train,
+                    y_train,
                     eval_set=[(X_val, y_val)],
                     callbacks=[
                         lgb.early_stopping(50, verbose=False),
@@ -203,7 +208,8 @@ class OptunaTuner:
                     verbosity=0,
                 )
                 model.fit(
-                    X_train, y_train,
+                    X_train,
+                    y_train,
                     eval_set=[(X_val, y_val)],
                     verbose=False,
                 )
@@ -272,9 +278,7 @@ class OptunaTuner:
 
             if config_key and config_key in config:
                 # Filter to only hyperparameter-relevant keys
-                hyper_keys = set(LIGHTGBM_SEARCH_SPACE.keys()) | set(XGBOOST_SEARCH_SPACE.keys()) | {
-                    "scale_pos_weight"
-                }
+                hyper_keys = set(LIGHTGBM_SEARCH_SPACE.keys()) | set(XGBOOST_SEARCH_SPACE.keys()) | {"scale_pos_weight"}
                 tuned_params = {k: v for k, v in self.best_params.items() if k in hyper_keys}
                 config[config_key]["hyperparameters"].update(tuned_params)
 

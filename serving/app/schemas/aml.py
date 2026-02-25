@@ -111,14 +111,18 @@ class SanctionsScreenResult(BaseModel):
 
 
 class AMLCaseUpdateRequest(BaseModel):
-    status: str = Field(..., pattern="^(OPEN|INVESTIGATING|ESCALATED|CLOSED_FALSE_POSITIVE|CLOSED_CONFIRMED|CLOSED_INCONCLUSIVE)$")
+    status: str = Field(
+        ..., pattern="^(OPEN|INVESTIGATING|ESCALATED|CLOSED_FALSE_POSITIVE|CLOSED_CONFIRMED|CLOSED_INCONCLUSIVE)$"
+    )
     assigned_to: UUID | None = None
     notes: str | None = Field(None, max_length=2000)
     resolution: str | None = Field(None, max_length=500)
 
 
 class AMLCaseListRequest(BaseModel):
-    status: str | None = Field(None, pattern="^(OPEN|INVESTIGATING|ESCALATED|CLOSED_FALSE_POSITIVE|CLOSED_CONFIRMED|CLOSED_INCONCLUSIVE)$")
+    status: str | None = Field(
+        None, pattern="^(OPEN|INVESTIGATING|ESCALATED|CLOSED_FALSE_POSITIVE|CLOSED_CONFIRMED|CLOSED_INCONCLUSIVE)$"
+    )
     priority: str | None = Field(None, pattern="^(LOW|MEDIUM|HIGH|CRITICAL)$")
     assigned_to: UUID | None = None
     limit: int = Field(50, ge=1, le=500)

@@ -31,6 +31,7 @@ RETRYABLE_EXCEPTIONS: tuple[Type[Exception], ...] = (
 # Attempt to include asyncpg connection errors if available
 try:
     import asyncpg
+
     RETRYABLE_EXCEPTIONS = (*RETRYABLE_EXCEPTIONS, asyncpg.PostgresConnectionError)
 except ImportError:
     pass
@@ -38,6 +39,7 @@ except ImportError:
 # Attempt to include Redis connection errors
 try:
     import redis.exceptions
+
     RETRYABLE_EXCEPTIONS = (*RETRYABLE_EXCEPTIONS, redis.exceptions.ConnectionError, redis.exceptions.TimeoutError)
 except ImportError:
     pass
@@ -84,8 +86,8 @@ def with_retry(
 
 
 class CircuitState(str, Enum):
-    CLOSED = "CLOSED"        # Normal operation, requests pass through
-    OPEN = "OPEN"            # Failing, requests short-circuit to fallback
+    CLOSED = "CLOSED"  # Normal operation, requests pass through
+    OPEN = "OPEN"  # Failing, requests short-circuit to fallback
     HALF_OPEN = "HALF_OPEN"  # Testing recovery, allow one request through
 
 
@@ -146,9 +148,7 @@ class CircuitBreaker:
 
         if self._failure_count >= self.failure_threshold and self._state != CircuitState.OPEN:
             self._state = CircuitState.OPEN
-            logger.warning(
-                f"Circuit [{self.service_name}] OPENED after {self._failure_count} consecutive failures"
-            )
+            logger.warning(f"Circuit [{self.service_name}] OPENED after {self._failure_count} consecutive failures")
 
     def reset(self) -> None:
         """Manually reset the circuit to CLOSED."""
@@ -181,6 +181,7 @@ class CircuitBreaker:
 
 class CircuitOpenError(Exception):
     """Raised when a circuit breaker is open and no fallback is configured."""
+
     pass
 
 

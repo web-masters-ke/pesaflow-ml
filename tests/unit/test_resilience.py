@@ -163,6 +163,7 @@ class TestGetCircuitBreaker:
     def test_creates_singleton(self):
         # Clean state
         from serving.app.services.resilience import _circuit_breakers
+
         _circuit_breakers.clear()
 
         cb1 = get_circuit_breaker("redis")
@@ -171,6 +172,7 @@ class TestGetCircuitBreaker:
 
     def test_different_names_create_different_breakers(self):
         from serving.app.services.resilience import _circuit_breakers
+
         _circuit_breakers.clear()
 
         cb_redis = get_circuit_breaker("redis")

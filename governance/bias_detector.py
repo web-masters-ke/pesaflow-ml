@@ -97,17 +97,19 @@ class BiasDetector:
             precision = tp / max(tp + fp, 1)
             recall = tpr
 
-            metrics_by_group.append(FairnessMetrics(
-                group_name=attribute_name,
-                group_value=str(group),
-                sample_size=int(group_size),
-                positive_rate=float(positive_rate),
-                false_positive_rate=float(fpr),
-                false_negative_rate=float(fnr),
-                true_positive_rate=float(tpr),
-                precision=float(precision),
-                recall=float(recall),
-            ))
+            metrics_by_group.append(
+                FairnessMetrics(
+                    group_name=attribute_name,
+                    group_value=str(group),
+                    sample_size=int(group_size),
+                    positive_rate=float(positive_rate),
+                    false_positive_rate=float(fpr),
+                    false_negative_rate=float(fnr),
+                    true_positive_rate=float(tpr),
+                    precision=float(precision),
+                    recall=float(recall),
+                )
+            )
 
         # Compute disparate impact ratio
         di_ratio = self._compute_disparate_impact(metrics_by_group, reference_group)
@@ -120,9 +122,7 @@ class BiasDetector:
 
         # Overall fairness assessment
         overall_pass = (
-            di_ratio >= self._di_threshold
-            and fpr_ratio >= self._fpr_threshold
-            and eo_ratio >= self._eo_threshold
+            di_ratio >= self._di_threshold and fpr_ratio >= self._fpr_threshold and eo_ratio >= self._eo_threshold
         )
 
         if not overall_pass:
@@ -238,9 +238,7 @@ class BiasDetector:
         return {
             "total_evaluations": len(reports),
             "overall_fairness_pass": all_pass,
-            "failing_attributes": [
-                r.protected_attribute for r in reports if not r.overall_fairness_pass
-            ],
+            "failing_attributes": [r.protected_attribute for r in reports if not r.overall_fairness_pass],
             "disparate_impact_scores": {r.protected_attribute: r.disparate_impact_ratio for r in reports},
             "fpr_parity_scores": {r.protected_attribute: r.fpr_parity_ratio for r in reports},
             "equal_opportunity_scores": {r.protected_attribute: r.equal_opportunity_ratio for r in reports},

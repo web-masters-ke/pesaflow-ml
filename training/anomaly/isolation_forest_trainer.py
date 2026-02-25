@@ -132,7 +132,7 @@ class IsolationForestTrainer:
 
             # Check anomaly detection rates
             predictions = model.predict(X)  # -1 = anomaly, 1 = normal
-            flagged = (predictions == -1)
+            flagged = predictions == -1
             if y.sum() > 0:
                 recall = (flagged & (y == 1)).sum() / y.sum()
                 metrics["anomaly_recall"] = float(recall)
@@ -169,18 +169,18 @@ class IsolationForestTrainer:
         with open(meta_path, "w") as f:
             json.dump(metadata, f, indent=2, default=str)
 
-    def _log_to_mlflow(
-        self, model: IsolationForest, metrics: dict, version: str, n_estimators: int
-    ) -> None:
+    def _log_to_mlflow(self, model: IsolationForest, metrics: dict, version: str, n_estimators: int) -> None:
         """Log to MLflow."""
         try:
             with mlflow.start_run(run_name=f"{self.domain}-iforest-{version}"):
-                mlflow.log_params({
-                    "domain": self.domain,
-                    "model_type": "isolation_forest",
-                    "n_estimators": n_estimators,
-                    "contamination": self.contamination,
-                })
+                mlflow.log_params(
+                    {
+                        "domain": self.domain,
+                        "model_type": "isolation_forest",
+                        "n_estimators": n_estimators,
+                        "contamination": self.contamination,
+                    }
+                )
                 safe_metrics = {k: v for k, v in metrics.items() if isinstance(v, (int, float))}
                 mlflow.log_metrics(safe_metrics)
                 mlflow.set_tag("model_version", version)

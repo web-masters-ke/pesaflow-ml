@@ -10,11 +10,34 @@ from serving.app.schemas.aml import AMLFeatureVector, AMLScoreRequest
 
 # High-risk jurisdictions per FATF grey/black list
 HIGH_RISK_COUNTRIES = {
-    "IR", "KP", "MM", "SY", "YE", "AF",  # FATF blacklist
-    "PK", "NG", "AL", "BB", "BF", "CM",  # FATF greylist (subset)
-    "CD", "GH", "HT", "JM", "JO", "ML",
-    "MZ", "PA", "PH", "SN", "SS", "TZ",
-    "TR", "UG", "VN", "ZA",
+    "IR",
+    "KP",
+    "MM",
+    "SY",
+    "YE",
+    "AF",  # FATF blacklist
+    "PK",
+    "NG",
+    "AL",
+    "BB",
+    "BF",
+    "CM",  # FATF greylist (subset)
+    "CD",
+    "GH",
+    "HT",
+    "JM",
+    "JO",
+    "ML",
+    "MZ",
+    "PA",
+    "PH",
+    "SN",
+    "SS",
+    "TZ",
+    "TR",
+    "UG",
+    "VN",
+    "ZA",
 }
 
 SANCTIONED_COUNTRIES = {"IR", "KP", "SY", "CU", "VE"}
@@ -95,9 +118,7 @@ class AMLFeatureExtractor:
         if self._db:
             try:
                 async with self._db.acquire() as conn:
-                    row = await conn.fetchrow(
-                        "SELECT * FROM aml_user_features WHERE user_id = $1", user_id
-                    )
+                    row = await conn.fetchrow("SELECT * FROM aml_user_features WHERE user_id = $1", user_id)
                     if row:
                         features = dict(row)
                         try:
@@ -158,7 +179,9 @@ class AMLFeatureExtractor:
         country = request.geo_location.country.upper() if request.geo_location else ""
 
         high_risk_flag = 1 if country in HIGH_RISK_COUNTRIES else 0
-        sanctions_proximity = 1.0 if country in SANCTIONED_COUNTRIES else (0.5 if country in HIGH_RISK_COUNTRIES else 0.0)
+        sanctions_proximity = (
+            1.0 if country in SANCTIONED_COUNTRIES else (0.5 if country in HIGH_RISK_COUNTRIES else 0.0)
+        )
 
         # Cross-border: if sender/receiver wallets differ and geo indicates different country
         is_cross_border = 0
@@ -201,7 +224,11 @@ class AMLFeatureExtractor:
             txn_count_24h = int(await self._redis.get(f"aml:user:{user_id}:txn_count:24h") or 0)
             volume_24h = float(await self._redis.get(f"aml:user:{user_id}:volume:24h") or 0.0)
 
-            if txn_count_24h >= 5 and request.amount < reporting_threshold and volume_24h + request.amount > reporting_threshold:
+            if (
+                txn_count_24h >= 5
+                and request.amount < reporting_threshold
+                and volume_24h + request.amount > reporting_threshold
+            ):
                 features["structuring_score_24h"] = min(1.0, txn_count_24h / 10.0)
 
             # Rapid drain: large outflow relative to balance

@@ -56,9 +56,7 @@ def _build_service(
 
     from serving.app.services.decision_engine import AMLDecisionEngine, AMLThresholdConfig
 
-    decision_engine = AMLDecisionEngine(
-        AMLThresholdConfig(medium_above=0.50, high_above=0.70, critical_above=0.85)
-    )
+    decision_engine = AMLDecisionEngine(AMLThresholdConfig(medium_above=0.50, high_above=0.70, critical_above=0.85))
 
     sanctions_service = MagicMock()
     sanctions_service.is_blacklisted_user.return_value = False
