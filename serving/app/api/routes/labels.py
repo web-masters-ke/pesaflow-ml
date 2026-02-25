@@ -1,5 +1,7 @@
 """Label Feedback & Active Learning API Routes."""
 
+from uuid import UUID
+
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from serving.app.api.dependencies import ServiceContainer, get_container
@@ -29,6 +31,8 @@ router = APIRouter(prefix="/labels", tags=["Label Feedback & Active Learning"])
 def _get_label_service(container: ServiceContainer) -> LabelFeedbackService:
     from serving.app.kafka.producer import publish_label_updated
 
+    if container.redis_client is None:
+        raise HTTPException(status_code=503, detail="Redis not available")
     return LabelFeedbackService(
         db_pool=container.db_pool,
         redis_client=container.redis_client,
@@ -37,6 +41,8 @@ def _get_label_service(container: ServiceContainer) -> LabelFeedbackService:
 
 
 def _get_al_service(container: ServiceContainer) -> ActiveLearningService:
+    if container.redis_client is None:
+        raise HTTPException(status_code=503, detail="Redis not available")
     return ActiveLearningService(
         db_pool=container.db_pool,
         redis_client=container.redis_client,
@@ -277,5 +283,5 @@ async def create_cases_from_queue(
     return ALCreateCasesResponse(
         domain=request.domain,
         cases_created=len(created_ids),
-        prediction_ids=created_ids,
+        prediction_ids=[UUID(pid) for pid in created_ids],
     )

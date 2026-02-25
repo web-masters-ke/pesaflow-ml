@@ -1,8 +1,9 @@
 """Pesaflow ML — Real-Time Fraud Detection & AML Risk Scoring Engine."""
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
 from starlette.responses import JSONResponse
@@ -24,7 +25,7 @@ from serving.app.settings import get_settings
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Startup and shutdown lifecycle."""
     settings = get_settings()
     logger.info(f"Starting {settings.SERVICE_NAME} v{settings.SERVICE_VERSION} [{settings.ENVIRONMENT}]")
@@ -93,7 +94,7 @@ def create_app() -> FastAPI:
 
     # === Global exception handler ===
     @app.exception_handler(Exception)
-    async def global_exception_handler(request, exc):
+    async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         logger.error(f"Unhandled exception: {exc}")
         return JSONResponse(
             status_code=500,

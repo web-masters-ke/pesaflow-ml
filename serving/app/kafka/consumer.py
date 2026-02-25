@@ -69,6 +69,8 @@ async def stop_kafka_consumer() -> None:
 
 async def _consume_loop() -> None:
     """Main consumer loop — processes transaction events."""
+    if _consumer is None:
+        return
     while True:
         try:
             async for message in _consumer:
@@ -104,16 +106,18 @@ async def _process_transaction_event(topic: str, data: dict) -> None:
     # === Fraud Scoring ===
     if _container.fraud_scoring_service and _container.fraud_model and _container.fraud_model.is_loaded:
         try:
-            fraud_request = FraudScoreRequest(
-                transaction_id=transaction_id,
-                user_id=data.get("user_id", data.get("sender_id")),
-                amount=float(data.get("amount", 0)),
-                currency=data.get("currency", "KES"),
-                transaction_type=data.get("transaction_type", data.get("type", "UNKNOWN")),
-                device_fingerprint=data.get("device_fingerprint", data.get("device_id")),
-                ip_address=data.get("ip_address"),
-                timestamp=data.get("timestamp"),
-            )
+            fraud_kwargs: dict = {
+                "transaction_id": transaction_id,
+                "user_id": data.get("user_id", data.get("sender_id")),
+                "amount": float(data.get("amount", 0)),
+                "currency": data.get("currency", "KES"),
+                "transaction_type": data.get("transaction_type", data.get("type", "UNKNOWN")),
+                "device_fingerprint": data.get("device_fingerprint", data.get("device_id")),
+                "ip_address": data.get("ip_address"),
+            }
+            if data.get("timestamp"):
+                fraud_kwargs["timestamp"] = data["timestamp"]
+            fraud_request = FraudScoreRequest(**fraud_kwargs)
 
             fraud_result = await _container.fraud_scoring_service.score_transaction(fraud_request)
 
@@ -140,18 +144,20 @@ async def _process_transaction_event(topic: str, data: dict) -> None:
     # === AML Scoring ===
     if _container.aml_scoring_service and _container.aml_model and _container.aml_model.is_loaded:
         try:
-            aml_request = AMLScoreRequest(
-                transaction_id=transaction_id,
-                user_id=data.get("user_id", data.get("sender_id")),
-                sender_wallet_id=data.get("sender_wallet_id"),
-                receiver_wallet_id=data.get("receiver_wallet_id"),
-                amount=float(data.get("amount", 0)),
-                currency=data.get("currency", "KES"),
-                device_id=data.get("device_fingerprint", data.get("device_id")),
-                ip_address=data.get("ip_address"),
-                channel=data.get("channel"),
-                timestamp=data.get("timestamp"),
-            )
+            aml_kwargs: dict = {
+                "transaction_id": transaction_id,
+                "user_id": data.get("user_id", data.get("sender_id")),
+                "sender_wallet_id": data.get("sender_wallet_id"),
+                "receiver_wallet_id": data.get("receiver_wallet_id"),
+                "amount": float(data.get("amount", 0)),
+                "currency": data.get("currency", "KES"),
+                "device_id": data.get("device_fingerprint", data.get("device_id")),
+                "ip_address": data.get("ip_address"),
+                "channel": data.get("channel"),
+            }
+            if data.get("timestamp"):
+                aml_kwargs["timestamp"] = data["timestamp"]
+            aml_request = AMLScoreRequest(**aml_kwargs)
 
             aml_result = await _container.aml_scoring_service.score_transaction(aml_request)
 
@@ -184,14 +190,17 @@ async def _process_transaction_event(topic: str, data: dict) -> None:
         and _container.merchant_model.is_loaded
     ):
         try:
-            merchant_request = MerchantScoreRequest(
-                merchant_id=merchant_id,
-                transaction_id=transaction_id,
-                amount=float(data.get("amount", 0)),
-                currency=data.get("currency", "KES"),
-                customer_id=data.get("user_id", data.get("sender_id")),
-                timestamp=data.get("timestamp"),
-            )
+            merchant_kwargs: dict = {
+                "merchant_id": merchant_id,
+                "transaction_id": transaction_id,
+                "amount": float(data.get("amount", 0)),
+                "currency": data.get("currency", "KES"),
+                "customer_id": data.get("user_id", data.get("sender_id")),
+                "mcc_code": data.get("mcc_code"),
+            }
+            if data.get("timestamp"):
+                merchant_kwargs["timestamp"] = data["timestamp"]
+            merchant_request = MerchantScoreRequest(**merchant_kwargs)
 
             merchant_result = await _container.merchant_risk_service.score_merchant(merchant_request)
 
@@ -220,7 +229,7 @@ async def _process_chargeback_event(data: dict) -> None:
     from serving.app.services.label_feedback_service import LabelFeedbackService
 
     transaction_id = data.get("transaction_id") or data.get("id")
-    if not transaction_id or not _container.db_pool:
+    if not transaction_id or not _container.db_pool or not _container.redis_client:
         return
 
     try:
@@ -258,7 +267,7 @@ async def _process_partner_feedback_event(data: dict) -> None:
     if prediction_id is None or domain_str is None or label is None:
         logger.warning("Partner feedback missing required fields")
         return
-    if not _container.db_pool:
+    if not _container.db_pool or not _container.redis_client:
         return
 
     try:

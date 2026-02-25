@@ -141,7 +141,7 @@ class MerchantRiskModel(BaseModel):
             values = shap_values[0]
 
         feature_names = self.feature_schema.feature_names
-        contributions = []
+        contributions: list[dict[str, Any]] = []
         for i, name in enumerate(feature_names):
             contributions.append(
                 {
@@ -262,7 +262,7 @@ class MerchantRiskModel(BaseModel):
         impacts = self._compute_heuristic_impacts(features)
         feature_names = self.feature_schema.feature_names
 
-        contributions = []
+        contributions: list[dict[str, Any]] = []
         for i, name in enumerate(feature_names):
             contributions.append(
                 {

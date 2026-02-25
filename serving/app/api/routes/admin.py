@@ -47,31 +47,31 @@ async def get_thresholds(
     merchant_thresholds = {}
 
     if container.fraud_scoring_service:
-        t = container.fraud_scoring_service._decision.thresholds
+        ft = container.fraud_scoring_service._decision.thresholds
         fraud_thresholds = {
-            "approve_below": t.approve_below,
-            "review_above": t.review_above,
-            "block_above": t.block_above,
-            "version": t.version,
+            "approve_below": ft.approve_below,
+            "review_above": ft.review_above,
+            "block_above": ft.block_above,
+            "version": ft.version,
         }
 
     if container.aml_scoring_service:
-        t = container.aml_scoring_service._decision.thresholds
+        at = container.aml_scoring_service._decision.thresholds
         aml_thresholds = {
-            "medium_above": t.medium_above,
-            "high_above": t.high_above,
-            "critical_above": t.critical_above,
-            "version": t.version,
+            "medium_above": at.medium_above,
+            "high_above": at.high_above,
+            "critical_above": at.critical_above,
+            "version": at.version,
         }
 
     if container.merchant_risk_service:
-        t = container.merchant_risk_service._decision.thresholds
+        mt = container.merchant_risk_service._decision.thresholds
         merchant_thresholds = {
-            "standard_below": t.standard_below,
-            "enhanced_above": t.enhanced_above,
-            "restricted_above": t.restricted_above,
-            "blocked_above": t.blocked_above,
-            "version": t.version,
+            "standard_below": mt.standard_below,
+            "enhanced_above": mt.enhanced_above,
+            "restricted_above": mt.restricted_above,
+            "blocked_above": mt.blocked_above,
+            "version": mt.version,
         }
 
     return {"fraud": fraud_thresholds, "aml": aml_thresholds, "merchant": merchant_thresholds}
@@ -88,80 +88,80 @@ async def update_thresholds(
     version = ""
 
     if request.model_type == "fraud" and container.fraud_scoring_service:
-        t = container.fraud_scoring_service._decision.thresholds
-        previous = {"approve_below": t.approve_below, "review_above": t.review_above, "block_above": t.block_above}
+        ft = container.fraud_scoring_service._decision.thresholds
+        previous = {"approve_below": ft.approve_below, "review_above": ft.review_above, "block_above": ft.block_above}
 
         if "approve_below" in request.thresholds:
-            t.approve_below = request.thresholds["approve_below"]
+            ft.approve_below = request.thresholds["approve_below"]
         if "review_above" in request.thresholds:
-            t.review_above = request.thresholds["review_above"]
+            ft.review_above = request.thresholds["review_above"]
         if "block_above" in request.thresholds:
-            t.block_above = request.thresholds["block_above"]
+            ft.block_above = request.thresholds["block_above"]
 
-        if not t.validate():
+        if not ft.validate():
             # Rollback
-            t.approve_below = previous["approve_below"]
-            t.review_above = previous["review_above"]
-            t.block_above = previous["block_above"]
+            ft.approve_below = previous["approve_below"]
+            ft.review_above = previous["review_above"]
+            ft.block_above = previous["block_above"]
             raise HTTPException(status_code=400, detail="Invalid thresholds: must be approve < review < block")
 
-        t.version = f"tv{datetime.utcnow().strftime('%Y%m%d%H%M')}"
-        version = t.version
-        updated = {"approve_below": t.approve_below, "review_above": t.review_above, "block_above": t.block_above}
+        ft.version = f"tv{datetime.utcnow().strftime('%Y%m%d%H%M')}"
+        version = ft.version
+        updated = {"approve_below": ft.approve_below, "review_above": ft.review_above, "block_above": ft.block_above}
 
     elif request.model_type == "aml" and container.aml_scoring_service:
-        t = container.aml_scoring_service._decision.thresholds
-        previous = {"medium_above": t.medium_above, "high_above": t.high_above, "critical_above": t.critical_above}
+        at = container.aml_scoring_service._decision.thresholds
+        previous = {"medium_above": at.medium_above, "high_above": at.high_above, "critical_above": at.critical_above}
 
         if "medium_above" in request.thresholds:
-            t.medium_above = request.thresholds["medium_above"]
+            at.medium_above = request.thresholds["medium_above"]
         if "high_above" in request.thresholds:
-            t.high_above = request.thresholds["high_above"]
+            at.high_above = request.thresholds["high_above"]
         if "critical_above" in request.thresholds:
-            t.critical_above = request.thresholds["critical_above"]
+            at.critical_above = request.thresholds["critical_above"]
 
-        if not t.validate():
-            t.medium_above = previous["medium_above"]
-            t.high_above = previous["high_above"]
-            t.critical_above = previous["critical_above"]
+        if not at.validate():
+            at.medium_above = previous["medium_above"]
+            at.high_above = previous["high_above"]
+            at.critical_above = previous["critical_above"]
             raise HTTPException(status_code=400, detail="Invalid AML thresholds: must be medium < high < critical")
 
-        t.version = f"atv{datetime.utcnow().strftime('%Y%m%d%H%M')}"
-        version = t.version
-        updated = {"medium_above": t.medium_above, "high_above": t.high_above, "critical_above": t.critical_above}
+        at.version = f"atv{datetime.utcnow().strftime('%Y%m%d%H%M')}"
+        version = at.version
+        updated = {"medium_above": at.medium_above, "high_above": at.high_above, "critical_above": at.critical_above}
 
     elif request.model_type == "merchant" and container.merchant_risk_service:
-        t = container.merchant_risk_service._decision.thresholds
+        mrt = container.merchant_risk_service._decision.thresholds
         previous = {
-            "standard_below": t.standard_below,
-            "enhanced_above": t.enhanced_above,
-            "restricted_above": t.restricted_above,
-            "blocked_above": t.blocked_above,
+            "standard_below": mrt.standard_below,
+            "enhanced_above": mrt.enhanced_above,
+            "restricted_above": mrt.restricted_above,
+            "blocked_above": mrt.blocked_above,
         }
 
         if "standard_below" in request.thresholds:
-            t.standard_below = request.thresholds["standard_below"]
+            mrt.standard_below = request.thresholds["standard_below"]
         if "enhanced_above" in request.thresholds:
-            t.enhanced_above = request.thresholds["enhanced_above"]
+            mrt.enhanced_above = request.thresholds["enhanced_above"]
         if "restricted_above" in request.thresholds:
-            t.restricted_above = request.thresholds["restricted_above"]
+            mrt.restricted_above = request.thresholds["restricted_above"]
         if "blocked_above" in request.thresholds:
-            t.blocked_above = request.thresholds["blocked_above"]
+            mrt.blocked_above = request.thresholds["blocked_above"]
 
-        if not t.validate():
-            t.standard_below = previous["standard_below"]
-            t.enhanced_above = previous["enhanced_above"]
-            t.restricted_above = previous["restricted_above"]
-            t.blocked_above = previous["blocked_above"]
+        if not mrt.validate():
+            mrt.standard_below = previous["standard_below"]
+            mrt.enhanced_above = previous["enhanced_above"]
+            mrt.restricted_above = previous["restricted_above"]
+            mrt.blocked_above = previous["blocked_above"]
             raise HTTPException(status_code=400, detail="Invalid merchant thresholds")
 
-        t.version = f"mtv{datetime.utcnow().strftime('%Y%m%d%H%M')}"
-        version = t.version
+        mrt.version = f"mtv{datetime.utcnow().strftime('%Y%m%d%H%M')}"
+        version = mrt.version
         updated = {
-            "standard_below": t.standard_below,
-            "enhanced_above": t.enhanced_above,
-            "restricted_above": t.restricted_above,
-            "blocked_above": t.blocked_above,
+            "standard_below": mrt.standard_below,
+            "enhanced_above": mrt.enhanced_above,
+            "restricted_above": mrt.restricted_above,
+            "blocked_above": mrt.blocked_above,
         }
 
     else:

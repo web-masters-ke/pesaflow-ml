@@ -2,6 +2,7 @@
 
 import json
 from datetime import datetime
+from typing import Any
 
 import redis.asyncio as redis
 from loguru import logger
@@ -44,7 +45,7 @@ SANCTIONED_COUNTRIES = {"IR", "KP", "SY", "CU", "VE"}
 
 
 class AMLFeatureExtractor:
-    def __init__(self, redis_client: redis.Redis, db_pool: any = None):
+    def __init__(self, redis_client: redis.Redis, db_pool: Any = None):
         self._redis = redis_client
         self._db = db_pool
 
@@ -205,10 +206,10 @@ class AMLFeatureExtractor:
             return 0
         try:
             known_devices_key = f"aml:user:{user_id}:known_devices"
-            is_member = await self._redis.sismember(known_devices_key, device_id)
+            is_member = await self._redis.sismember(known_devices_key, device_id)  # type: ignore[misc]
             if not is_member:
-                await self._redis.sadd(known_devices_key, device_id)
-                await self._redis.expire(known_devices_key, 86400 * 30)
+                await self._redis.sadd(known_devices_key, device_id)  # type: ignore[misc]
+                await self._redis.expire(known_devices_key, 86400 * 30)  # type: ignore[misc]
                 return 1
             return 0
         except Exception:

@@ -99,7 +99,7 @@ class AnomalyModel(BaseModel):
         raw_scores = self._model.decision_function(arr)
 
         # Normalize batch
-        normalized = self._sigmoid(-raw_scores * 5)
+        normalized: np.ndarray = np.asarray(self._sigmoid(-raw_scores * 5))
         return [max(0.0, min(1.0, float(s))) for s in normalized]
 
     def get_shap_values(self, features: list[float]) -> list[dict]:
@@ -114,7 +114,7 @@ class AnomalyModel(BaseModel):
         base_score = self._model.decision_function(arr)[0]
 
         feature_names = self.feature_schema.feature_names
-        contributions = []
+        contributions: list[dict[str, Any]] = []
 
         for i, name in enumerate(feature_names):
             # Perturb feature to 0 and measure change

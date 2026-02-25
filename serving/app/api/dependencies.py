@@ -101,17 +101,22 @@ class ServiceContainer:
         else:
             logger.warning(f"AML model artifact not found at {aml_path} — run training first")
 
+        # Capture redis_client as a local variable for type narrowing
+        redis_cl = self.redis_client
+        if redis_cl is None:
+            raise RuntimeError("Redis client must be initialized before services")
+
         # Initialize sanctions service
         self.sanctions_service = SanctionsScreeningService(
-            redis_client=self.redis_client,
+            redis_client=redis_cl,
             db_pool=self.db_pool,
             fuzzy_threshold=self.settings.SANCTIONS_FUZZY_THRESHOLD,
         )
         await self.sanctions_service.load_sanctions_data()
 
         # Initialize feature extractors
-        fraud_features = FraudFeatureExtractor(redis_client=self.redis_client, db_pool=self.db_pool)
-        aml_features = AMLFeatureExtractor(redis_client=self.redis_client, db_pool=self.db_pool)
+        fraud_features = FraudFeatureExtractor(redis_client=redis_cl, db_pool=self.db_pool)
+        aml_features = AMLFeatureExtractor(redis_client=redis_cl, db_pool=self.db_pool)
 
         # Initialize decision engines
         fraud_decision = FraudDecisionEngine(
@@ -136,7 +141,7 @@ class ServiceContainer:
             decision_engine=fraud_decision,
             sanctions_service=self.sanctions_service,
             metrics=self.metrics,
-            redis_client=self.redis_client,
+            redis_client=redis_cl,
             db_pool=self.db_pool,
         )
 
@@ -146,7 +151,7 @@ class ServiceContainer:
             decision_engine=aml_decision,
             sanctions_service=self.sanctions_service,
             metrics=self.metrics,
-            redis_client=self.redis_client,
+            redis_client=redis_cl,
             db_pool=self.db_pool,
         )
 
@@ -159,7 +164,7 @@ class ServiceContainer:
             logger.warning(f"Merchant model artifact not found at {merchant_path} — run training first")
 
         # Initialize merchant features + decision engine
-        merchant_features = MerchantFeatureExtractor(redis_client=self.redis_client, db_pool=self.db_pool)
+        merchant_features = MerchantFeatureExtractor(redis_client=redis_cl, db_pool=self.db_pool)
         merchant_decision = MerchantDecisionEngine(
             MerchantThresholdConfig(
                 standard_below=self.settings.MERCHANT_STANDARD_THRESHOLD,
@@ -174,7 +179,7 @@ class ServiceContainer:
             feature_extractor=merchant_features,
             decision_engine=merchant_decision,
             metrics=self.metrics,
-            redis_client=self.redis_client,
+            redis_client=redis_cl,
             db_pool=self.db_pool,
         )
 

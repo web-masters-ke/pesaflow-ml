@@ -111,7 +111,7 @@ class GraphRiskService:
                 for neighbor, weight in neighbors[node]:
                     votes[labels[neighbor]] += weight
 
-                best_label = max(votes, key=votes.get)
+                best_label = max(votes, key=lambda k: votes[k])
                 if labels[node] != best_label:
                     labels[node] = best_label
                     changed = True

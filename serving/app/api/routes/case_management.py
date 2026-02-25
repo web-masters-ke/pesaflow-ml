@@ -53,7 +53,7 @@ async def create_case(
         raise HTTPException(status_code=500, detail=f"Failed to create case: {e}")
 
     return AMLCaseResponse(
-        case_id=case_id,
+        case_id=uuid.UUID(case_id),
         entity_type=request.entity_type,
         entity_id=request.entity_id,
         trigger_reason=request.trigger_reason,
@@ -138,7 +138,7 @@ async def update_case(
         try:
             label = 1 if request.status == "CLOSED_CONFIRMED" else 0
             prediction_id = row.get("prediction_id")
-            if prediction_id:
+            if prediction_id and container.redis_client:
                 svc = LabelFeedbackService(
                     db_pool=container.db_pool,
                     redis_client=container.redis_client,

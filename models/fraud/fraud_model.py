@@ -148,7 +148,7 @@ class FraudDetectionModel(BaseModel):
             values = shap_values[0]
 
         feature_names = self.feature_schema.feature_names
-        contributions = []
+        contributions: list[dict[str, Any]] = []
         for i, name in enumerate(feature_names):
             contributions.append(
                 {
@@ -267,7 +267,7 @@ class FraudDetectionModel(BaseModel):
 
     def _heuristic_shap(self, features: list[float]) -> list[dict]:
         """Generate pseudo-SHAP values based on heuristic rule activations."""
-        contributions = []
+        contributions: list[dict[str, Any]] = []
         feature_names = self.feature_schema.feature_names
         base_score = 0.10
 

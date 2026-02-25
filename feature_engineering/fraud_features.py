@@ -3,6 +3,7 @@
 import json
 import math
 from datetime import datetime
+from typing import Any
 
 import redis.asyncio as redis
 from loguru import logger
@@ -15,7 +16,7 @@ MEDIUM_RISK_CURRENCIES = {"NGN", "GHS", "TZS", "UGX", "ETB"}
 
 
 class FraudFeatureExtractor:
-    def __init__(self, redis_client: redis.Redis, db_pool: any = None):
+    def __init__(self, redis_client: redis.Redis, db_pool: Any = None):
         self._redis = redis_client
         self._db = db_pool
 
@@ -161,7 +162,7 @@ class FraudFeatureExtractor:
             "geo_distance": geo_distance,
         }
 
-    async def update_velocity_counters(self, user_id: str, amount: float, geo_location: any = None) -> None:
+    async def update_velocity_counters(self, user_id: str, amount: float, geo_location: Any = None) -> None:
         """Atomically increment velocity counters after scoring."""
         try:
             pipe = self._redis.pipeline()

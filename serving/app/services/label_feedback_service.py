@@ -132,7 +132,7 @@ class LabelFeedbackService:
                 logger.warning(f"Kafka label publish failed: {e}")
 
         return LabelSubmitResponse(
-            prediction_id=prediction_id,
+            prediction_id=uuid.UUID(prediction_id) if isinstance(prediction_id, str) else prediction_id,
             domain=domain,
             label=label,
             label_source=label_source,

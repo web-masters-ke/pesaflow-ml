@@ -45,6 +45,7 @@ class BatchScoringService:
 
         for req in requests:
             try:
+                result: Any = None
                 if job_type == "FRAUD_RESCORE" and self._fraud:
                     result = await self._fraud.score_transaction(req)
                 elif job_type == "AML_RESCORE" and self._aml:

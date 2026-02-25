@@ -1,5 +1,7 @@
 """JWT Authentication Middleware."""
 
+from typing import Callable
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -33,7 +35,7 @@ async def verify_jwt(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
 
 
-def require_role(*roles: str):
+def require_role(*roles: str) -> Callable:
     """Dependency that checks JWT payload for required role."""
 
     async def role_checker(payload: dict = Depends(verify_jwt)) -> dict:

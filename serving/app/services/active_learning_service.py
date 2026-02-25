@@ -387,7 +387,10 @@ class ActiveLearningService:
                 new_active,
             )
 
-        return await self.get_config(domain)
+        config = await self.get_config(domain)
+        if config is None:
+            raise ValueError(f"Config for domain {domain.value} not found after update")
+        return config
 
     # ─── Budget Tracking ───────────────────────────────────────────────
 

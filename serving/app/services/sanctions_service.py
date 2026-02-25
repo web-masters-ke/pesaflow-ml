@@ -1,6 +1,7 @@
 """Sanctions & Watchlist Screening Service."""
 
 from difflib import SequenceMatcher
+from typing import Any
 
 import redis.asyncio as redis
 from loguru import logger
@@ -11,7 +12,7 @@ from serving.app.schemas.aml import SanctionsScreenResult
 class SanctionsScreeningService:
     """Screen entities against OFAC, UN, and local sanctions/watchlists."""
 
-    def __init__(self, redis_client: redis.Redis, db_pool: any = None, fuzzy_threshold: float = 0.85):
+    def __init__(self, redis_client: redis.Redis, db_pool: Any = None, fuzzy_threshold: float = 0.85):
         self._redis = redis_client
         self._db = db_pool
         self._fuzzy_threshold = fuzzy_threshold
@@ -41,7 +42,7 @@ class SanctionsScreeningService:
             logger.error(f"Failed to load blacklists: {e}")
 
     async def _load_set(self, key: str) -> set[str]:
-        members = await self._redis.smembers(key)
+        members = await self._redis.smembers(key)  # type: ignore[misc]
         return {m.decode() if isinstance(m, bytes) else m for m in members}
 
     async def screen_user(self, user_name: str, user_id: str, country: str = "") -> SanctionsScreenResult:

@@ -43,7 +43,7 @@ def with_retry(
     backoff_base: float = 0.1,
     backoff_max: float = 2.0,
     retryable_exceptions: tuple[Type[Exception], ...] | None = None,
-):
+) -> Callable:
     """Decorator that retries async functions on transient infrastructure failures.
 
     Args:
