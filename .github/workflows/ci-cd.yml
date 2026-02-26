@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   lint-and-test:
@@ -90,9 +91,42 @@ jobs:
     environment: production
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: eu-west-2
 
-      - name: Deploy to Kubernetes
+      - name: Deploy via SSM
         run: |
-          echo "Deploying pesaflow-ml:${{ github.sha }} to production"
-          # kubectl set image deployment/pesaflow-ml pesaflow-ml=ghcr.io/${{ github.repository }}:${{ github.sha }}
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "i-06ff1020fc155c77b" \
+            --document-name "AWS-RunShellScript" \
+            --parameters "commands=[
+              'echo \"Deploying pesaflow-ml:${{ github.sha }}\"',
+              'docker pull ghcr.io/${{ github.repository }}:${{ github.sha }}',
+              'docker stop pesaflow-ml || true',
+              'docker rm pesaflow-ml || true',
+              'docker run -d --name pesaflow-ml --restart unless-stopped -p 8000:8000 --env-file /opt/pesaflow-ml/.env ghcr.io/${{ github.repository }}:${{ github.sha }}',
+              'sleep 5',
+              'curl -sf http://localhost:8000/health/live || exit 1',
+              'echo \"Deploy successful\"'
+            ]" \
+            --timeout-seconds 120 \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command ID: $COMMAND_ID"
+
+          # Wait for command to complete
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "i-06ff1020fc155c77b" || true
+
+          # Get command output
+          aws ssm get-command-invocation \
+            --command-id "$COMMAND_ID" \
+            --instance-id "i-06ff1020fc155c77b" \
+            --query "[Status, StandardOutputContent, StandardErrorContent]" \
+            --output text
