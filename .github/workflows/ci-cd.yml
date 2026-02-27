@@ -85,9 +85,9 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
-    needs: build-and-push
+    needs: lint-and-test
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     environment: production
 
     steps:
@@ -101,23 +101,32 @@ jobs:
       - name: Deploy via SSM
         run: |
           INSTANCE_ID="i-06ff1020fc155c77b"
-          IMAGE="ghcr.io/${{ github.repository }}:${{ github.sha }}"
+          REPO="https://github.com/${{ github.repository }}.git"
+          SHA="${{ github.sha }}"
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters "commands=[
               'set -e',
-              'echo \"Deploying $IMAGE\"',
-              'docker pull $IMAGE',
+              'echo \"Deploying pesaflow-ml @ $SHA\"',
+              'docker image prune -f 2>/dev/null || true',
+              'rm -rf /opt/pesaflow-ml-new',
+              'git clone --depth=1 $REPO /opt/pesaflow-ml-new',
+              'cd /opt/pesaflow-ml-new && git log --oneline -1',
+              'cp /opt/pesaflow-ml/.env /opt/pesaflow-ml-new/.env 2>/dev/null || true',
+              'cd /opt/pesaflow-ml-new && docker build -f docker/Dockerfile --target runtime -t pesaflow-ml:latest . 2>&1 | tail -20',
               'docker stop pesaflow-ml 2>/dev/null || true',
               'docker rm pesaflow-ml 2>/dev/null || true',
-              'docker run -d --name pesaflow-ml --restart unless-stopped -p 8000:8000 --env-file /opt/pesaflow-ml/.env $IMAGE',
-              'sleep 5',
-              'curl -sf http://localhost:8000/health/live',
-              'echo \"Deploy successful\"'
+              'rm -rf /opt/pesaflow-ml-old',
+              'mv /opt/pesaflow-ml /opt/pesaflow-ml-old 2>/dev/null || true',
+              'mv /opt/pesaflow-ml-new /opt/pesaflow-ml',
+              'docker run -d --name pesaflow-ml --restart unless-stopped --network pesaflow_pesaflow-network -p 18743:8000 --env-file /opt/pesaflow-ml/.env -v pesaflow_ml_model_artifacts:/app/model_artifacts pesaflow-ml:latest',
+              'sleep 15',
+              'docker ps --filter name=pesaflow-ml --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\"',
+              'curl -sf http://localhost:18743/health/live && echo \" Deploy successful\" || (docker logs pesaflow-ml --tail 30 && exit 1)'
             ]" \
-            --timeout-seconds 120 \
+            --timeout-seconds 600 \
             --query "Command.CommandId" \
             --output text)
 

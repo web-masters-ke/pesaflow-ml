@@ -11,7 +11,8 @@
     { "key": "user_id", "value": "550e8400-e29b-41d4-a716-446655440001" },
     { "key": "merchant_id", "value": "550e8400-e29b-41d4-a716-446655440005" },
     { "key": "case_id", "value": "" },
-    { "key": "batch_job_id", "value": "" }
+    { "key": "batch_job_id", "value": "" },
+    { "key": "prediction_id", "value": "550e8400-e29b-41d4-a716-446655440099" }
   ],
   "item": [
     {
@@ -1131,6 +1132,23 @@
           ]
         },
         {
+          "name": "Get Batch Job Status",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/batch/jobs/{{batch_job_id}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', () => [200, 404].includes(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        },
+        {
           "name": "Export STR Report",
           "request": {
             "method": "POST",
@@ -1151,6 +1169,308 @@
               "script": {
                 "exec": [
                   "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Download Exported File",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/batch/export/download/test-report.json"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', () => [200, 404].includes(pm.response.code));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Label Feedback & Active Learning",
+      "description": "Submit ground-truth labels for predictions, view statistics, trigger label propagation, and manage the active learning review queue.",
+      "item": [
+        {
+          "name": "Submit Label",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/labels/submit",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_id\": \"{{prediction_id}}\",\n  \"domain\": \"fraud\",\n  \"label\": 1,\n  \"label_source\": \"MANUAL_REVIEW\",\n  \"labeled_by\": \"{{user_id}}\",\n  \"reason\": \"Confirmed fraudulent — chargeback received\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has prediction_id', () => pm.expect(json).to.have.property('prediction_id'));",
+                  "pm.test('Has domain', () => pm.expect(json.domain).to.be.oneOf(['fraud', 'aml', 'merchant']));",
+                  "pm.test('Label is 0 or 1', () => pm.expect(json.label).to.be.oneOf([0, 1]));",
+                  "pm.test('Has labeled_at', () => pm.expect(json).to.have.property('labeled_at'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Label — Legitimate (label=0)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/labels/submit",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prediction_id\": \"{{prediction_id}}\",\n  \"domain\": \"aml\",\n  \"label\": 0,\n  \"label_source\": \"SAR_CONFIRMED\",\n  \"reason\": \"Investigation cleared — no suspicious activity\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Label is 0', () => pm.expect(pm.response.json().label).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit Batch Labels",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/labels/submit/batch",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"labels\": [\n    {\n      \"prediction_id\": \"{{prediction_id}}\",\n      \"domain\": \"fraud\",\n      \"label\": 1,\n      \"label_source\": \"CHARGEBACK_FEED\"\n    },\n    {\n      \"prediction_id\": \"{{transaction_id}}\",\n      \"domain\": \"aml\",\n      \"label\": 0,\n      \"label_source\": \"MANUAL_REVIEW\",\n      \"reason\": \"Cleared after investigation\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has total count', () => pm.expect(json).to.have.property('total'));",
+                  "pm.test('Has succeeded count', () => pm.expect(json).to.have.property('succeeded'));",
+                  "pm.test('Has results array', () => pm.expect(json.results).to.be.an('array'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Label Statistics",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/labels/statistics"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has domains array', () => pm.expect(json.domains).to.be.an('array'));",
+                  "pm.test('Has total_labeled', () => pm.expect(json).to.have.property('total_labeled'));",
+                  "pm.test('Has total_unlabeled', () => pm.expect(json).to.have.property('total_unlabeled'));",
+                  "pm.test('Each domain has maturity_level', () => { json.domains.forEach(d => pm.expect(d).to.have.property('maturity_level')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Trigger Label Propagation",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/labels/propagate"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has fraud_labels_propagated', () => pm.expect(json).to.have.property('fraud_labels_propagated'));",
+                  "pm.test('Has aml_labels_propagated', () => pm.expect(json).to.have.property('aml_labels_propagated'));",
+                  "pm.test('Has total_propagated', () => pm.expect(json).to.have.property('total_propagated'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get Active Learning Queue — Fraud",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/ml/labels/active-learning/queue?domain=fraud&limit=50&offset=0",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "ml", "labels", "active-learning", "queue"],
+              "query": [
+                { "key": "domain", "value": "fraud" },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has domain', () => pm.expect(json.domain).to.eql('fraud'));",
+                  "pm.test('Has items array', () => pm.expect(json.items).to.be.an('array'));",
+                  "pm.test('Has total', () => pm.expect(json).to.have.property('total'));",
+                  "pm.test('Has strategy', () => pm.expect(json).to.have.property('strategy'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Refresh Active Learning Queues",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/labels/active-learning/refresh"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has domains_refreshed', () => pm.expect(json.domains_refreshed).to.be.an('array'));",
+                  "pm.test('Has items_added', () => pm.expect(json).to.have.property('items_added'));",
+                  "pm.test('Has items_expired', () => pm.expect(json).to.have.property('items_expired'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get AL Config — Fraud",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/labels/active-learning/config/fraud"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', () => [200, 404].includes(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Has strategy', () => pm.expect(json).to.have.property('strategy'));",
+                  "  pm.test('Has daily_budget', () => pm.expect(json).to.have.property('daily_budget'));",
+                  "  pm.test('Has is_active', () => pm.expect(json).to.have.property('is_active'));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update AL Config — Fraud",
+          "request": {
+            "method": "PUT",
+            "url": "{{base_url}}/api/v1/ml/labels/active-learning/config/fraud",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"strategy\": \"UNCERTAINTY\",\n  \"daily_budget\": 100,\n  \"weekly_budget\": 500,\n  \"uncertainty_threshold\": 0.4,\n  \"is_active\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200 or 404', () => [200, 404].includes(pm.response.code));",
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  pm.test('Strategy updated', () => pm.expect(json.strategy).to.eql('UNCERTAINTY'));",
+                  "  pm.test('Budget updated', () => pm.expect(json.daily_budget).to.eql(100));",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get AL Metrics — Fraud",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/ml/labels/active-learning/metrics/fraud"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has domain', () => pm.expect(json.domain).to.eql('fraud'));",
+                  "pm.test('Has total_queued', () => pm.expect(json).to.have.property('total_queued'));",
+                  "pm.test('Has labels_today', () => pm.expect(json).to.have.property('labels_today'));",
+                  "pm.test('Has label_yield_rate', () => pm.expect(json).to.have.property('label_yield_rate'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Review Cases from Queue",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/v1/ml/labels/active-learning/create-cases",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"domain\": \"fraud\",\n  \"count\": 10\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Has domain', () => pm.expect(json.domain).to.eql('fraud'));",
+                  "pm.test('Has cases_created', () => pm.expect(json).to.have.property('cases_created'));",
+                  "pm.test('Has prediction_ids', () => pm.expect(json.prediction_ids).to.be.an('array'));"
                 ]
               }
             }
